@@ -10,7 +10,7 @@ export const config = {
 export async function onRequest({ request, env }) {
   globalThis.__TURSO_URL = env.TURSO_DATABASE_URL;
   globalThis.__TURSO_TOKEN = env.TURSO_AUTH_TOKEN;
-  const RPC_URL = env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+  const RPC_URL = env.NEXT_PUBLIC_SOLANA_RPC_URL || env.SOLANA_RPC_URL || 'https://viviyan-bkj12u-fast-mainnet.helius-rpc.com';
   const JUP_API_KEY = env.JUP_API_KEY || '64a543a0-30cf-440e-a9e4-7463a8523e7f';
   // Token mints for price fetching
   const mints = {
