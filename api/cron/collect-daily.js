@@ -18,14 +18,12 @@ export default async function handler(req, res) {
   const mints = {
     SOL: 'So11111111111111111111111111111111111111112',
     BONK: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
-    ORE: 'oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp',
-    RADR: 'CzFvsLdUazabdiu9TYXujj4EY495fG7VgJJ3vQs6bonk'
+    ORE: 'oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp'
   };
 
   let solPrice = 180;
   let bonkPrice = 0;
   let orePrice = 0;
-  let radrPrice = 0;
 
   // Fetch prices from Jupiter API
   try {
@@ -37,7 +35,6 @@ export default async function handler(req, res) {
     solPrice = priceData?.[mints.SOL]?.usdPrice || 180;
     bonkPrice = priceData?.[mints.BONK]?.usdPrice || 0;
     orePrice = priceData?.[mints.ORE]?.usdPrice || 0;
-    radrPrice = priceData?.[mints.RADR]?.usdPrice || 0;
   } catch (e) {
     console.error('Jupiter price fetch error:', e);
   }
@@ -61,63 +58,6 @@ export default async function handler(req, res) {
     console.error('Turbine fetch error:', e);
   }
 
-  // Radr pool addresses and their expected token mints
-  const radrPools = {
-    SOL: { address: 'ApfNmzrNXLUQ5yWpQVmrCB4MNsaRqjsFrLXViBq2rBU', mint: 'So11111111111111111111111111111111111111112' },
-    USDC: { address: '6F3Z4qkEdHBhAysGapn4XFCboAyFQJ9fri7WM111bRhg', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' },
-    USD1: { address: '14kbizF6VZjSFLS21FjvgPYHz45oLzQBomhpiN89xFqv', mint: 'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYiQzvEmuB' },
-    BONK: { address: '5Dgqzu1RvX4U1dgpDosaXvzGKyqCwRLX41GcmhBfQTaD', mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' },
-    RADR: { address: 'HexBg3QDHTE5SKniXZgDARybQwnoEioDKxoUKBsxhtbT', mint: 'CzFvsLdUazabdiu9TYXujj4EY495fG7VgJJ3vQs6bonk' }
-  };
-
-  // Fetch all Radr pool balances in parallel
-  const radrBalances = {};
-  try {
-    const balancePromises = Object.entries(radrPools).map(async ([asset, { address, mint }]) => {
-      try {
-        if (asset === 'SOL') {
-          const res = await fetch(RPC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ method: 'getBalance', jsonrpc: '2.0', params: [address], id: '1' })
-          });
-          const data = await res.json();
-          return { asset, balance: (data?.result?.value || 0) / 1e9 };
-        } else if (asset === 'BONK') {
-          const res = await fetch(RPC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ method: 'getTokenAccountBalance', jsonrpc: '2.0', params: [address], id: '1' })
-          });
-          const data = await res.json();
-          return { asset, balance: data?.result?.value?.uiAmount || 0 };
-        } else {
-          const res = await fetch(RPC_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              method: 'getTokenAccountsByOwner',
-              jsonrpc: '2.0',
-              params: [address, { mint }, { encoding: 'jsonParsed' }],
-              id: '1'
-            })
-          });
-          const data = await res.json();
-          const tokenAccount = data?.result?.value?.[0];
-          const balance = parseFloat(tokenAccount?.account?.data?.parsed?.info?.tokenAmount?.uiAmountString || '0');
-          return { asset, balance };
-        }
-      } catch (e) {
-        console.error(`Radr ${asset} fetch error:`, e);
-        return { asset, balance: 0 };
-      }
-    });
-    const results = await Promise.all(balancePromises);
-    results.forEach(r => radrBalances[r.asset] = r.balance);
-  } catch (e) {
-    console.error('Radr balances fetch error:', e);
-  }
-
   // Vanish Trade pool address
   const vanishPoolAddress = '8MjKXQgj97NPVNhj9gJrQNP7BibGCGkFMVJ2qZsC58E';
 
@@ -133,6 +73,49 @@ export default async function handler(req, res) {
     vanishSol = (vanishData?.result?.value || 0) / 1e9;
   } catch (e) {
     console.error('Vanish Trade fetch error:', e);
+  }
+
+  // Mixoor pool address (single address for SOL + tokens)
+  const mixoorPoolAddress = 'CS31stgBRPvPMBvRAYgsRTbogNkRdUNTsoyQQLcYp7ZD';
+  const mixoorMints = {
+    USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    USD1: 'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYYiQzvEmuB'
+  };
+
+  // Fetch Mixoor balances
+  const mixoorBalances = { SOL: 0, USDC: 0, USD1: 0 };
+  try {
+    const solRes = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ method: 'getBalance', jsonrpc: '2.0', params: [mixoorPoolAddress], id: '1' })
+    });
+    const solData = await solRes.json();
+    mixoorBalances.SOL = (solData?.result?.value || 0) / 1e9;
+
+    const tokenRes = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        method: 'getTokenAccountsByOwner',
+        jsonrpc: '2.0',
+        params: [mixoorPoolAddress, { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }],
+        id: '1'
+      })
+    });
+    const tokenData = await tokenRes.json();
+    const accounts = tokenData?.result?.value || [];
+
+    accounts.forEach(acc => {
+      const info = acc?.account?.data?.parsed?.info;
+      const mint = info?.mint;
+      const balance = parseFloat(info?.tokenAmount?.uiAmountString || '0');
+
+      if (mint === mixoorMints.USDC) mixoorBalances.USDC = balance;
+      else if (mint === mixoorMints.USD1) mixoorBalances.USD1 = balance;
+    });
+  } catch (e) {
+    console.error('Mixoor fetch error:', e);
   }
 
   // Elusiv pool address
@@ -259,42 +242,7 @@ export default async function handler(req, res) {
       ],
       tvl: (privacyCashBalances.SOL * solPrice) + privacyCashBalances.USDC + privacyCashBalances.USDT + ((privacyCashBalances.ORE + privacyCashBalances.stORE) * orePrice)
     },
-    {
-      name: 'Radr Labs',
-      pools: [
-        {
-          asset: 'SOL',
-          address: radrPools.SOL.address,
-          balance: radrBalances.SOL || 0,
-          usd: (radrBalances.SOL || 0) * solPrice
-        },
-        {
-          asset: 'USDC',
-          address: radrPools.USDC.address,
-          balance: radrBalances.USDC || 0,
-          usd: radrBalances.USDC || 0
-        },
-        {
-          asset: 'USD1',
-          address: radrPools.USD1.address,
-          balance: radrBalances.USD1 || 0,
-          usd: radrBalances.USD1 || 0
-        },
-        {
-          asset: 'BONK',
-          address: radrPools.BONK.address,
-          balance: radrBalances.BONK || 0,
-          usd: (radrBalances.BONK || 0) * bonkPrice
-        },
-        {
-          asset: 'RADR',
-          address: radrPools.RADR.address,
-          balance: radrBalances.RADR || 0,
-          usd: (radrBalances.RADR || 0) * radrPrice
-        }
-      ],
-      tvl: ((radrBalances.SOL || 0) * solPrice) + (radrBalances.USDC || 0) + (radrBalances.USD1 || 0) + ((radrBalances.BONK || 0) * bonkPrice) + ((radrBalances.RADR || 0) * radrPrice)
-    },
+
     {
       name: 'Umbra',
       pools: [
@@ -321,6 +269,42 @@ export default async function handler(req, res) {
         }
       ],
       tvl: turbineZsol * solPrice
+    },
+    {
+      name: 'Vanish Trade',
+      pools: [
+        {
+          asset: 'SOL',
+          address: vanishPoolAddress,
+          balance: vanishSol,
+          usd: vanishSol * solPrice
+        }
+      ],
+      tvl: vanishSol * solPrice
+    },
+    {
+      name: 'Mixoor',
+      pools: [
+        {
+          asset: 'SOL',
+          address: mixoorPoolAddress,
+          balance: mixoorBalances.SOL,
+          usd: mixoorBalances.SOL * solPrice
+        },
+        {
+          asset: 'USDC',
+          address: mixoorPoolAddress,
+          balance: mixoorBalances.USDC,
+          usd: mixoorBalances.USDC
+        },
+        {
+          asset: 'USD1',
+          address: mixoorPoolAddress,
+          balance: mixoorBalances.USD1,
+          usd: mixoorBalances.USD1
+        }
+      ],
+      tvl: (mixoorBalances.SOL * solPrice) + mixoorBalances.USDC + mixoorBalances.USD1
     },
     {
       name: 'Elusiv',
@@ -351,18 +335,6 @@ export default async function handler(req, res) {
         }
       ],
       tvl: (elusivBalances.SOL * solPrice) + elusivBalances.USDC + elusivBalances.USDT + (elusivBalances.BONK * bonkPrice)
-    },
-    {
-      name: 'Vanish Trade',
-      pools: [
-        {
-          asset: 'SOL',
-          address: vanishPoolAddress,
-          balance: vanishSol,
-          usd: vanishSol * solPrice
-        }
-      ],
-      tvl: vanishSol * solPrice
     }
   ];
 
@@ -374,7 +346,7 @@ export default async function handler(req, res) {
       saveTokenPrice(timestamp, 'SOL', solPrice),
       saveTokenPrice(timestamp, 'BONK', bonkPrice),
       saveTokenPrice(timestamp, 'ORE', orePrice),
-      saveTokenPrice(timestamp, 'RADR', radrPrice)
+
     ]);
 
     // Save TVL snapshots for each protocol

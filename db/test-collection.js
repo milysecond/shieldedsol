@@ -14,7 +14,6 @@ async function testDataCollection() {
 
     console.log('Saving test TVL snapshots...');
     await saveTvlSnapshot(timestamp, 'Privacy Cash', 150000);
-    await saveTvlSnapshot(timestamp, 'Radr Labs', 75000);
     await saveTvlSnapshot(timestamp, 'Elusiv', 25000);
 
     console.log('Saving test pool balances...');

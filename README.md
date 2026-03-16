@@ -9,10 +9,10 @@ Real-time Solana privacy pool tracker. Monitor TVL across privacy protocols with
 | Protocol | Status | Pools |
 |----------|--------|-------|
 | Privacy Cash | Live | SOL, USDC, USDT, ORE |
-| Radr Labs | Live | SOL, USDC, USD1, BONK, RADR |
 | Light Protocol | Live | SOL |
 | Turbine | Live | ZSOL |
 | Vanish Trade | Live | SOL |
+| Mixoor | Live | SOL, USDC, USD1 |
 | Umbra | Upcoming | SOL, USDC |
 | Elusiv | Sunset | SOL, USDC, USDT, BONK |
 

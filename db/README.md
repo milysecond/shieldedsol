@@ -71,7 +71,7 @@ The `/api/protocols` endpoint returns live data fetched from the blockchain on e
 
 #### Historical Data (Cron Job)
 A Vercel Cron job runs daily at midnight UTC (`/api/cron/collect-daily`) to save historical snapshots:
-- Token prices (SOL, BONK, ORE, RADR)
+- Token prices (SOL, BONK, ORE)
 - TVL snapshots for all protocols
 - Pool balances for each asset
 
@@ -108,7 +108,7 @@ Query historical data using these endpoints:
 
 3. **Pool Balance History**
    ```
-   GET /api/history/pool?protocol=Radr%20Labs&asset=SOL&range=30d
+   GET /api/history/pool?protocol=Privacy%20Cash&asset=SOL&range=30d
    ```
    - Get balance history for a specific pool
 
