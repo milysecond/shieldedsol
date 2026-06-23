@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   // Fetch from our own protocols API
   try {
-    const apiRes = await fetch('https://shieldedsol.com/api/protocols');
+    const apiRes = await fetch('https://www.shieldedsol.com/api/protocols');
     const data = await apiRes.json();
 
     const tvlVal = data?.totalTvl || 0;

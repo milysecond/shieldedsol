@@ -4,7 +4,35 @@ export const config = {
   maxDuration: 30,
 };
 
-const RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const RPC_URLS = [
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL,
+  'https://solana-mainnet.publicnode.com',
+  'https://rpc.ankr.com/solana',
+  'https://api.mainnet-beta.solana.com',
+].filter(Boolean);
+
+async function rpcFetch(body) {
+  for (const url of RPC_URLS) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.error) return data;
+      }
+    } catch {
+      // try next RPC
+    }
+  }
+  return null;
+}
 
 export default async function handler(req, res) {
   // Token mints for price fetching
@@ -37,17 +65,7 @@ export default async function handler(req, res) {
   // Fetch Turbine ZSOL supply
   let turbineZsol = 0;
   try {
-    const turbineRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        method: 'getTokenSupply',
-        jsonrpc: '2.0',
-        params: ['zso1EF4k8HNteye34aD8w2Fm6pYVWMDgkgWCUrMLip1'],
-        id: '1'
-      })
-    });
-    const turbineData = await turbineRes.json();
+    const turbineData = await rpcFetch({ method: 'getTokenSupply', jsonrpc: '2.0', params: ['zso1EF4k8HNteye34aD8w2Fm6pYVWMDgkgWCUrMLip1'], id: '1' });
     turbineZsol = turbineData?.result?.value?.uiAmount || 0;
   } catch (e) {
     console.error('Turbine fetch error:', e);
@@ -59,12 +77,7 @@ export default async function handler(req, res) {
   // Fetch Vanish Trade SOL balance
   let vanishSol = 0;
   try {
-    const vanishRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: 'getBalance', jsonrpc: '2.0', params: [vanishPoolAddress], id: '1' })
-    });
-    const vanishData = await vanishRes.json();
+    const vanishData = await rpcFetch({ method: 'getBalance', jsonrpc: '2.0', params: [vanishPoolAddress], id: '1' });
     vanishSol = (vanishData?.result?.value || 0) / 1e9;
   } catch (e) {
     console.error('Vanish Trade fetch error:', e);
@@ -80,27 +93,10 @@ export default async function handler(req, res) {
   // Fetch Mixoor balances
   const mixoorBalances = { SOL: 0, USDC: 0, USD1: 0 };
   try {
-    // Fetch native SOL balance
-    const solRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: 'getBalance', jsonrpc: '2.0', params: [mixoorPoolAddress], id: '1' })
-    });
-    const solData = await solRes.json();
+    const solData = await rpcFetch({ method: 'getBalance', jsonrpc: '2.0', params: [mixoorPoolAddress], id: '1' });
     mixoorBalances.SOL = (solData?.result?.value || 0) / 1e9;
 
-    // Fetch all token accounts
-    const tokenRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        method: 'getTokenAccountsByOwner',
-        jsonrpc: '2.0',
-        params: [mixoorPoolAddress, { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }],
-        id: '1'
-      })
-    });
-    const tokenData = await tokenRes.json();
+    const tokenData = await rpcFetch({ method: 'getTokenAccountsByOwner', jsonrpc: '2.0', params: [mixoorPoolAddress, { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }], id: '1' });
     const accounts = tokenData?.result?.value || [];
 
     accounts.forEach(acc => {
@@ -126,27 +122,10 @@ export default async function handler(req, res) {
   // Fetch Elusiv balances
   const elusivBalances = { SOL: 0, USDC: 0, USDT: 0, BONK: 0 };
   try {
-    // Fetch native SOL balance
-    const solRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: 'getBalance', jsonrpc: '2.0', params: [elusivPoolAddress], id: '1' })
-    });
-    const solData = await solRes.json();
+    const solData = await rpcFetch({ method: 'getBalance', jsonrpc: '2.0', params: [elusivPoolAddress], id: '1' });
     elusivBalances.SOL = (solData?.result?.value || 0) / 1e9;
 
-    // Fetch all token accounts
-    const tokenRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        method: 'getTokenAccountsByOwner',
-        jsonrpc: '2.0',
-        params: [elusivPoolAddress, { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }],
-        id: '1'
-      })
-    });
-    const tokenData = await tokenRes.json();
+    const tokenData = await rpcFetch({ method: 'getTokenAccountsByOwner', jsonrpc: '2.0', params: [elusivPoolAddress, { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }], id: '1' });
     const accounts = tokenData?.result?.value || [];
 
     // Map balances by mint
@@ -176,27 +155,10 @@ export default async function handler(req, res) {
   // Fetch Privacy Cash balances
   const privacyCashBalances = { SOL: 0, USDC: 0, USDT: 0, ORE: 0, stORE: 0 };
   try {
-    // Fetch native SOL balance from SOL pool address
-    const solRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ method: 'getBalance', jsonrpc: '2.0', params: [privacyCashSolAddress], id: '1' })
-    });
-    const solData = await solRes.json();
+    const solData = await rpcFetch({ method: 'getBalance', jsonrpc: '2.0', params: [privacyCashSolAddress], id: '1' });
     privacyCashBalances.SOL = (solData?.result?.value || 0) / 1e9;
 
-    // Fetch all token accounts from token pool address
-    const tokenRes = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        method: 'getTokenAccountsByOwner',
-        jsonrpc: '2.0',
-        params: [privacyCashTokenAddress, { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }],
-        id: '1'
-      })
-    });
-    const tokenData = await tokenRes.json();
+    const tokenData = await rpcFetch({ method: 'getTokenAccountsByOwner', jsonrpc: '2.0', params: [privacyCashTokenAddress, { programId: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' }, { encoding: 'jsonParsed' }], id: '1' });
     const accounts = tokenData?.result?.value || [];
 
     // Map balances by mint
@@ -212,6 +174,19 @@ export default async function handler(req, res) {
     });
   } catch (e) {
     console.error('Privacy Cash fetch error:', e);
+  }
+
+  // Fetch Umbra TVL from DeFiLlama (Umbra is the DeFi app built on Arcium MPC network)
+  let umbraTvl = 0;
+  try {
+    const llamaRes = await fetch('https://api.llama.fi/protocol/umbra', { signal: AbortSignal.timeout(5000) });
+    const llamaData = await llamaRes.json();
+    const tvlArr = llamaData?.tvl || [];
+    if (tvlArr.length > 0) {
+      umbraTvl = tvlArr[tvlArr.length - 1]?.totalLiquidityUSD || 0;
+    }
+  } catch (e) {
+    console.error('DeFiLlama Umbra fetch error:', e);
   }
 
   const protocols = [
@@ -250,11 +225,19 @@ export default async function handler(req, res) {
 
     {
       name: 'Umbra',
-      status: 'upcoming',
-      url: 'https://umbraprivacy.com',
+      status: 'live',
+      url: 'https://app.arcium.com',
       pools: [
-        { asset: 'SOL', address: null, balance: 0, usd: 0 },
-        { asset: 'USDC', address: null, balance: 0, usd: 0 }
+        { asset: 'USD', address: null, balance: umbraTvl, usd: umbraTvl }
+      ],
+      tvl: umbraTvl
+    },
+    {
+      name: 'Arcium',
+      status: 'live',
+      url: 'https://arcium.com',
+      pools: [
+        { asset: 'USD', address: null, balance: 0, usd: 0 }
       ],
       tvl: 0
     },

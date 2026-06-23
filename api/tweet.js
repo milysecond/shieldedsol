@@ -9,7 +9,7 @@ async function fetchTVL() {
 
   // Fetch from our own protocols API
   try {
-    const apiRes = await fetch('https://shieldedsol.com/api/protocols');
+    const apiRes = await fetch('https://www.shieldedsol.com/api/protocols');
     const data = await apiRes.json();
     totalTvl = data?.totalTvl || 0;
 
