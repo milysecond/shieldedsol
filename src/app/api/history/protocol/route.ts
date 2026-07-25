@@ -50,13 +50,22 @@ export async function GET(request: NextRequest) {
           tvl: row.tvl_usd,
         })),
       },
-      { headers: { 'Cache-Control': 'public, max-age=300' } }
+      { headers: { 'Cache-Control': 'public, max-age=120' } }
     );
   } catch (error) {
     console.error('Error fetching protocol history:', error);
+    // Soft-fail so UI charts don't break the page
     return NextResponse.json(
-      { error: 'Failed to fetch protocol history' },
-      { status: 500 }
+      {
+        protocol,
+        range,
+        startDate: startDate.toISOString(),
+        endDate: now.toISOString(),
+        dataPoints: 0,
+        history: [],
+        source: 'empty',
+      },
+      { headers: { 'Cache-Control': 'public, max-age=30' } }
     );
   }
 }

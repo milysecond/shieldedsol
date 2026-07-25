@@ -1,11 +1,42 @@
-import { MINTS, POOL_ADDRESSES } from './constants';
+import {
+  MINTS,
+  POOL_ADDRESSES,
+  SOLANA_RPC,
+  ARCIUM_STAKING_PROGRAM,
+  ARCIUM_OPERATOR_ACCOUNT_SIZE,
+} from './constants';
 
 const RPC_URLS = [
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL,
+  SOLANA_RPC,
+  'https://solana-rpc.publicnode.com',
   'https://solana-mainnet.publicnode.com',
-  'https://rpc.ankr.com/solana',
   'https://api.mainnet-beta.solana.com',
 ].filter(Boolean) as string[];
+
+const JUP_API_KEY =
+  process.env.JUP_API_KEY || '3309da44-211b-4acb-9d31-c36fb54d9459';
+
+const UMBRA_POOLS_URL = 'https://ownership.umbraprivacy.com/api/pools';
+const ARCIUM_NODES_URL =
+  'https://explorer.arcium.com/api/v1/nodes?network=mainnet';
+const ARCIUM_CLUSTERS_URL =
+  'https://explorer.arcium.com/api/v1/clusters?network=mainnet';
+
+const UMBRA_DISPLAY_ASSETS = [
+  'kmSOL',
+  'wSOL',
+  'USDC',
+  'USDT',
+  'UMBRA',
+  'ZINC',
+  'CASH',
+  'ARX',
+] as const;
+
+/** In-isolate cache so warm requests stay fast */
+let cache: { at: number; data: ProtocolsResponse } | null = null;
+const CACHE_TTL_MS = 45_000;
 
 async function rpcCall(method: string, params: unknown[]) {
   const body = JSON.stringify({ method, jsonrpc: '2.0', params, id: '1' });
@@ -15,7 +46,7 @@ async function rpcCall(method: string, params: unknown[]) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(4000),
       });
       if (res.ok) {
         const data = await res.json();
@@ -77,8 +108,13 @@ export interface Protocol {
   name: string;
   status: string;
   url: string;
+  linkText?: string;
   pools: Pool[];
   tvl: number;
+  /** Optional non-TVL subtitle (e.g. Arcium network stats) */
+  stats?: string;
+  /** infra = compute network without pool TVL */
+  kind?: 'pool' | 'infra';
 }
 
 export interface ProtocolsResponse {
@@ -88,117 +124,346 @@ export interface ProtocolsResponse {
   totalTvl: number;
   protocols: Protocol[];
   updatedAt: string;
+  cached?: boolean;
 }
 
-export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
-  // Fetch prices from Jupiter API
+interface UmbraPoolResponse {
+  label?: string;
+  address?: string;
+  snapshot?: {
+    totalUsdValue?: number;
+    primaryHolding?: {
+      amount?: number;
+      usdValue?: number;
+      symbol?: string;
+    };
+  };
+}
+
+async function fetchUmbra(): Promise<{ pools: Pool[]; tvl: number }> {
+  const res = await fetch(UMBRA_POOLS_URL, {
+    signal: AbortSignal.timeout(7000),
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Umbra pools HTTP ${res.status}`);
+  const data = await res.json();
+
+  const rawPools: UmbraPoolResponse[] = data?.pools || [];
+  const mapped = rawPools
+    .map((p) => {
+      const asset = p.label || p.snapshot?.primaryHolding?.symbol || 'UNKNOWN';
+      const usd =
+        p.snapshot?.totalUsdValue ?? p.snapshot?.primaryHolding?.usdValue ?? 0;
+      const balance = p.snapshot?.primaryHolding?.amount ?? 0;
+      return {
+        asset,
+        address: p.address || null,
+        balance: Number(balance) || 0,
+        usd: Number(usd) || 0,
+      } satisfies Pool;
+    })
+    .filter((p) => p.usd > 0 || p.balance > 0)
+    .sort((a, b) => b.usd - a.usd);
+
+  const preferred = new Set<string>(
+    UMBRA_DISPLAY_ASSETS as unknown as string[]
+  );
+  const display: Pool[] = [];
+  let otherUsd = 0;
+  let otherBal = 0;
+
+  for (const p of mapped) {
+    if (preferred.has(p.asset)) display.push(p);
+    else {
+      otherUsd += p.usd;
+      otherBal += p.balance;
+    }
+  }
+
+  display.sort((a, b) => {
+    const ia = UMBRA_DISPLAY_ASSETS.indexOf(
+      a.asset as (typeof UMBRA_DISPLAY_ASSETS)[number]
+    );
+    const ib = UMBRA_DISPLAY_ASSETS.indexOf(
+      b.asset as (typeof UMBRA_DISPLAY_ASSETS)[number]
+    );
+    if (ia === -1 && ib === -1) return b.usd - a.usd;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+
+  if (otherUsd >= 1) {
+    display.push({
+      asset: 'OTHER',
+      address: null,
+      balance: otherBal,
+      usd: otherUsd,
+    });
+  }
+
+  const tvl =
+    typeof data?.totals?.usd === 'number'
+      ? data.totals.usd
+      : mapped.reduce((s, p) => s + p.usd, 0);
+
+  return { pools: display, tvl };
+}
+
+async function fetchJson(url: string, ms: number) {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(ms),
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
+  return res.json();
+}
+
+/** Fast path only — avoid flaky /stats which often times out ~8–15s */
+async function fetchArciumNetworkMeta(): Promise<string> {
+  try {
+    const [nodesJson, clustersJson] = await Promise.all([
+      fetchJson(ARCIUM_NODES_URL, 3000).catch(() => null),
+      fetchJson(ARCIUM_CLUSTERS_URL, 3000).catch(() => null),
+    ]);
+    const nodes = Array.isArray(nodesJson?.data)
+      ? nodesJson.data
+      : Array.isArray(nodesJson)
+        ? nodesJson
+        : [];
+    const clusters = Array.isArray(clustersJson?.data)
+      ? clustersJson.data
+      : Array.isArray(clustersJson)
+        ? clustersJson
+        : [];
+
+    const parts: string[] = [];
+    if (nodes.length) parts.push(`${nodes.length} nodes`);
+    if (clusters.length) parts.push(`${clusters.length} clusters`);
+    if (!parts.length) return 'Confidential compute · operator stake';
+    parts.push('operator stake');
+    return parts.join(' · ');
+  } catch {
+    return 'Confidential compute · operator stake';
+  }
+}
+
+/**
+ * Read total ARX staked to operators from Arcium staking program accounts.
+ * Operator accounts are fixed-size (652 bytes). Stake amount is max(u64@8, u64@16)
+ * in base units (9 decimals) — matches stake.arcium.com operator table totals.
+ */
+async function fetchArciumStakedArx(): Promise<{
+  stakedArx: number;
+  operators: number;
+}> {
+  const data = await rpcCall('getProgramAccounts', [
+    ARCIUM_STAKING_PROGRAM,
+    {
+      encoding: 'base64',
+      filters: [{ dataSize: ARCIUM_OPERATOR_ACCOUNT_SIZE }],
+      commitment: 'confirmed',
+    },
+  ]);
+
+  const accounts: Array<{ account?: { data?: [string, string] } }> =
+    data?.result || [];
+  let stakedArx = 0;
+  let operators = 0;
+
+  for (const acc of accounts) {
+    const b64 = acc?.account?.data?.[0];
+    if (!b64) continue;
+    // Edge-safe base64 decode
+    const binary = atob(b64);
+    if (binary.length < 24) continue;
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const u8 = Number(view.getBigUint64(8, true));
+    const u16 = Number(view.getBigUint64(16, true));
+    const raw = Math.max(u8, u16);
+    // Sanity: 0 – 50M ARX per operator account
+    if (raw <= 0 || raw > 50_000_000 * 1e9) continue;
+    stakedArx += raw / 1e9;
+    operators += 1;
+  }
+
+  return { stakedArx, operators };
+}
+
+async function buildProtocolsData(): Promise<ProtocolsResponse> {
+  const [
+    priceResult,
+    turbineResult,
+    vanishResult,
+    mixoorResult,
+    elusivResult,
+    pcResult,
+    umbraResult,
+    arciumStakeResult,
+    arciumMetaResult,
+  ] = await Promise.allSettled([
+    (async () => {
+      const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE, MINTS.ARX].join(',');
+      const priceRes = await fetch(
+        `https://api.jup.ag/price/v3?ids=${mintIds}`,
+        {
+          headers: { 'x-api-key': JUP_API_KEY },
+          signal: AbortSignal.timeout(5000),
+        }
+      );
+      if (!priceRes.ok) throw new Error(`Jupiter HTTP ${priceRes.status}`);
+      return priceRes.json();
+    })(),
+    getTokenSupply(MINTS.ZSOL),
+    getBalance(POOL_ADDRESSES.VANISH_TRADE),
+    (async () => {
+      const SOL = await getBalance(POOL_ADDRESSES.MIXOOR);
+      const tokens = await getTokenAccountsByOwner(POOL_ADDRESSES.MIXOOR, {
+        USDC: MINTS.USDC,
+        USD1: MINTS.USD1,
+      });
+      return { SOL, USDC: tokens.USDC || 0, USD1: tokens.USD1 || 0 };
+    })(),
+    (async () => {
+      const SOL = await getBalance(POOL_ADDRESSES.ELUSIV);
+      const tokens = await getTokenAccountsByOwner(POOL_ADDRESSES.ELUSIV, {
+        USDC: MINTS.USDC,
+        USDT: MINTS.USDT,
+        BONK: MINTS.BONK,
+      });
+      return {
+        SOL,
+        USDC: tokens.USDC || 0,
+        USDT: tokens.USDT || 0,
+        BONK: tokens.BONK || 0,
+      };
+    })(),
+    (async () => {
+      const SOL = await getBalance(POOL_ADDRESSES.PRIVACY_CASH_SOL);
+      const tokens = await getTokenAccountsByOwner(
+        POOL_ADDRESSES.PRIVACY_CASH_TOKEN,
+        {
+          USDC: MINTS.USDC,
+          USDT: MINTS.USDT,
+          ORE: MINTS.ORE,
+          stORE: MINTS.stORE,
+        }
+      );
+      return {
+        SOL,
+        USDC: tokens.USDC || 0,
+        USDT: tokens.USDT || 0,
+        ORE: tokens.ORE || 0,
+        stORE: tokens.stORE || 0,
+      };
+    })(),
+    fetchUmbra(),
+    fetchArciumStakedArx(),
+    fetchArciumNetworkMeta(),
+  ]);
+
   let solPrice = 180;
   let bonkPrice = 0;
   let orePrice = 0;
-
-  try {
-    const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE].join(',');
-    const priceRes = await fetch(`https://api.jup.ag/price/v3?ids=${mintIds}`, {
-      headers: {
-        'x-api-key':
-          process.env.JUP_API_KEY || '64a543a0-30cf-440e-a9e4-7463a8523e7f',
-      },
-    });
-    const priceData = await priceRes.json();
+  let arxPrice = 0;
+  if (priceResult.status === 'fulfilled') {
+    const priceData = priceResult.value;
     solPrice = priceData?.[MINTS.SOL]?.usdPrice || 180;
     bonkPrice = priceData?.[MINTS.BONK]?.usdPrice || 0;
     orePrice = priceData?.[MINTS.ORE]?.usdPrice || 0;
-  } catch (e) {
-    console.error('Jupiter price fetch error:', e);
+    arxPrice = priceData?.[MINTS.ARX]?.usdPrice || 0;
+  } else {
+    console.error('Jupiter price fetch error:', priceResult.reason);
   }
 
-  // Fetch Turbine ZSOL supply
-  let turbineZsol = 0;
-  try {
-    turbineZsol = await getTokenSupply(MINTS.ZSOL);
-  } catch (e) {
-    console.error('Turbine fetch error:', e);
-  }
-
-  // Fetch Vanish Trade SOL balance
-  let vanishSol = 0;
-  try {
-    vanishSol = await getBalance(POOL_ADDRESSES.VANISH_TRADE);
-  } catch (e) {
-    console.error('Vanish Trade fetch error:', e);
-  }
-
-  // Fetch Mixoor balances
-  const mixoorBalances = { SOL: 0, USDC: 0, USD1: 0 };
-  try {
-    mixoorBalances.SOL = await getBalance(POOL_ADDRESSES.MIXOOR);
-    const tokens = await getTokenAccountsByOwner(POOL_ADDRESSES.MIXOOR, {
-      USDC: MINTS.USDC,
-      USD1: MINTS.USD1,
-    });
-    mixoorBalances.USDC = tokens.USDC || 0;
-    mixoorBalances.USD1 = tokens.USD1 || 0;
-  } catch (e) {
-    console.error('Mixoor fetch error:', e);
-  }
-
-  // Fetch Elusiv balances
-  const elusivBalances = { SOL: 0, USDC: 0, USDT: 0, BONK: 0 };
-  try {
-    elusivBalances.SOL = await getBalance(POOL_ADDRESSES.ELUSIV);
-    const tokens = await getTokenAccountsByOwner(POOL_ADDRESSES.ELUSIV, {
-      USDC: MINTS.USDC,
-      USDT: MINTS.USDT,
-      BONK: MINTS.BONK,
-    });
-    elusivBalances.USDC = tokens.USDC || 0;
-    elusivBalances.USDT = tokens.USDT || 0;
-    elusivBalances.BONK = tokens.BONK || 0;
-  } catch (e) {
-    console.error('Elusiv fetch error:', e);
-  }
-
-  // Fetch Privacy Cash balances
-  const pcBalances = { SOL: 0, USDC: 0, USDT: 0, ORE: 0, stORE: 0 };
-  try {
-    pcBalances.SOL = await getBalance(POOL_ADDRESSES.PRIVACY_CASH_SOL);
-    const tokens = await getTokenAccountsByOwner(
-      POOL_ADDRESSES.PRIVACY_CASH_TOKEN,
-      {
-        USDC: MINTS.USDC,
-        USDT: MINTS.USDT,
-        ORE: MINTS.ORE,
-        stORE: MINTS.stORE,
-      }
-    );
-    pcBalances.USDC = tokens.USDC || 0;
-    pcBalances.USDT = tokens.USDT || 0;
-    pcBalances.ORE = tokens.ORE || 0;
-    pcBalances.stORE = tokens.stORE || 0;
-  } catch (e) {
-    console.error('Privacy Cash fetch error:', e);
-  }
-
-  // Fetch Umbra TVL from DeFiLlama (Umbra is the privacy DeFi app built on Arcium MPC network)
-  let umbraTvl = 0;
-  try {
-    const llamaRes = await fetch('https://api.llama.fi/protocol/umbra', {
-      signal: AbortSignal.timeout(5000),
-    });
-    const llamaData = await llamaRes.json();
-    const tvlArr: Array<{ totalLiquidityUSD: number }> = llamaData?.tvl || [];
-    if (tvlArr.length > 0) {
-      umbraTvl = tvlArr[tvlArr.length - 1]?.totalLiquidityUSD || 0;
+  // Llama fallback for ARX if Jupiter misses it
+  if (!arxPrice) {
+    try {
+      const coin = await fetchJson(
+        `https://coins.llama.fi/prices/current/solana:${MINTS.ARX}`,
+        4000
+      );
+      arxPrice =
+        coin?.coins?.[`solana:${MINTS.ARX}`]?.price ||
+        coin?.coins?.['solana:ARXwZkNAtzPfdcoqQiduJn8EPv9fKiDfGn2KyggyDrFs']
+          ?.price ||
+        0;
+    } catch {
+      /* keep 0 */
     }
-  } catch (e) {
-    console.error('DeFiLlama Umbra fetch error:', e);
   }
+
+  const turbineZsol =
+    turbineResult.status === 'fulfilled' ? turbineResult.value : 0;
+  const vanishSol =
+    vanishResult.status === 'fulfilled' ? vanishResult.value : 0;
+  const mixoorBalances =
+    mixoorResult.status === 'fulfilled'
+      ? mixoorResult.value
+      : { SOL: 0, USDC: 0, USD1: 0 };
+  const elusivBalances =
+    elusivResult.status === 'fulfilled'
+      ? elusivResult.value
+      : { SOL: 0, USDC: 0, USDT: 0, BONK: 0 };
+  const pcBalances =
+    pcResult.status === 'fulfilled'
+      ? pcResult.value
+      : { SOL: 0, USDC: 0, USDT: 0, ORE: 0, stORE: 0 };
+
+  let umbraPools: Pool[] = [];
+  let umbraTvl = 0;
+  if (umbraResult.status === 'fulfilled') {
+    umbraPools = umbraResult.value.pools;
+    umbraTvl = umbraResult.value.tvl;
+  } else {
+    console.error('Umbra fetch error:', umbraResult.reason);
+  }
+
+  const stakedArx =
+    arciumStakeResult.status === 'fulfilled'
+      ? arciumStakeResult.value.stakedArx
+      : 0;
+  const arciumOperators =
+    arciumStakeResult.status === 'fulfilled'
+      ? arciumStakeResult.value.operators
+      : 0;
+  if (arciumStakeResult.status === 'rejected') {
+    console.error('Arcium stake fetch error:', arciumStakeResult.reason);
+  }
+  const arciumMeta =
+    arciumMetaResult.status === 'fulfilled'
+      ? arciumMetaResult.value
+      : 'Confidential compute · operator stake';
+  const arciumUsd = stakedArx * arxPrice;
+  const arciumStats = [
+    arciumMeta,
+    arciumOperators > 0 ? `${arciumOperators} operator accounts` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const arciumPools: Pool[] =
+    stakedArx > 0
+      ? [
+          {
+            asset: 'ARX',
+            address: ARCIUM_STAKING_PROGRAM,
+            balance: stakedArx,
+            usd: arciumUsd,
+          },
+        ]
+      : [];
+  const arciumKind: 'pool' | 'infra' = stakedArx > 0 ? 'pool' : 'infra';
 
   const protocols: Protocol[] = [
     {
       name: 'Privacy Cash',
       status: 'live',
       url: 'https://privacycash.org',
+      linkText: 'privacycash.org',
+      kind: 'pool',
       pools: [
         {
           asset: 'SOL',
@@ -234,28 +499,38 @@ export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
     {
       name: 'Umbra',
       status: 'live',
-      url: 'https://app.arcium.com',
-      pools: [{ asset: 'USD', address: null, balance: umbraTvl, usd: umbraTvl }],
+      url: 'https://app.umbraprivacy.com',
+      linkText: 'app.umbraprivacy.com',
+      kind: 'pool',
+      pools: umbraPools,
       tvl: umbraTvl,
     },
     {
       name: 'Arcium',
       status: 'live',
-      url: 'https://arcium.com',
-      pools: [],
-      tvl: 0,
+      url: 'https://stake.arcium.com',
+      linkText: 'stake.arcium.com',
+      kind: arciumKind,
+      pools: arciumPools,
+      tvl: arciumUsd,
+      stats: arciumStats || 'Confidential compute · operator stake',
     },
     {
       name: 'Light Protocol',
       status: 'live',
       url: 'https://lightprotocol.com',
+      linkText: 'lightprotocol.com',
+      kind: 'pool',
       pools: [{ asset: 'SOL', address: null, balance: 0, usd: 0 }],
       tvl: 0,
+      stats: 'ZK compression · TVL feed pending',
     },
     {
       name: 'Turbine',
       status: 'live',
       url: 'https://turbine.cash',
+      linkText: 'turbine.cash',
+      kind: 'pool',
       pools: [
         {
           asset: 'ZSOL',
@@ -270,6 +545,8 @@ export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
       name: 'Vanish Trade',
       status: 'live',
       url: 'https://www.vanish.trade/@shielded',
+      linkText: 'vanish.trade',
+      kind: 'pool',
       pools: [
         {
           asset: 'SOL',
@@ -284,6 +561,8 @@ export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
       name: 'Mixoor',
       status: 'live',
       url: 'https://mixoor.fun',
+      linkText: 'mixoor.fun',
+      kind: 'pool',
       pools: [
         {
           asset: 'SOL',
@@ -313,6 +592,8 @@ export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
       name: 'Elusiv',
       status: 'sunset',
       url: 'https://elusiv.io',
+      linkText: 'elusiv.io',
+      kind: 'pool',
       pools: [
         {
           asset: 'SOL',
@@ -347,7 +628,17 @@ export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
     },
   ];
 
-  const totalTvl = protocols.reduce((sum, p) => sum + p.tvl, 0);
+  // Sort live pool protocols by TVL, keep sunset last, infra after pools with TVL
+  protocols.sort((a, b) => {
+    if (a.status === 'sunset' && b.status !== 'sunset') return 1;
+    if (b.status === 'sunset' && a.status !== 'sunset') return -1;
+    if (a.kind === 'infra' && b.kind !== 'infra') return 1;
+    if (b.kind === 'infra' && a.kind !== 'infra') return -1;
+    return b.tvl - a.tvl;
+  });
+
+  // Total excludes pure infra (already tvl 0)
+  const totalTvl = protocols.reduce((sum, p) => sum + (p.tvl || 0), 0);
 
   return {
     solPrice,
@@ -357,4 +648,14 @@ export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
     protocols,
     updatedAt: new Date().toISOString(),
   };
+}
+
+export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
+  if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
+    return { ...cache.data, cached: true };
+  }
+
+  const data = await buildProtocolsData();
+  cache = { at: Date.now(), data };
+  return { ...data, cached: false };
 }

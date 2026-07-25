@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import { SITE_URL, SITE_NAME, GA_ID } from '@/lib/constants';
-import WalletProvider from '@/components/WalletProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -11,11 +10,11 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description:
-    'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash and other privacy pools with live balances, historical charts, and TVL alerts.',
+    'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
   openGraph: {
     title: `${SITE_NAME} - Real-Time Solana Privacy Pool Tracker`,
     description:
-      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash and other privacy pools with live balances, historical charts, and TVL alerts.',
+      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
     url: SITE_URL,
     siteName: SITE_NAME,
     type: 'website',
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
     site: '@shieldedsol',
     title: `${SITE_NAME} - Real-Time Solana Privacy Pool Tracker`,
     description:
-      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash and other privacy pools with live balances, historical charts, and TVL alerts.',
+      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
     images: ['/api/og'],
   },
   icons: {
@@ -83,8 +82,7 @@ export default function RootLayout({
                 '@type': 'WebSite',
                 name: SITE_NAME,
                 url: SITE_URL,
-                description:
-                  'Track Solana privacy protocol TVL in real-time',
+                description: 'Track Solana privacy protocol TVL in real-time',
                 image: `${SITE_URL}/logo.png`,
               },
               {
@@ -93,7 +91,7 @@ export default function RootLayout({
                 name: SITE_NAME,
                 url: SITE_URL,
                 description:
-                  'Real-time Solana privacy pool TVL tracker. Monitor Privacy Cash and other privacy protocols with live balances, historical charts, and alerts.',
+                  'Real-time Solana privacy pool TVL tracker. Monitor Privacy Cash, Umbra and other privacy protocols with live balances, historical charts, and alerts.',
                 applicationCategory: 'FinanceApplication',
                 operatingSystem: 'Web',
                 offers: {
@@ -126,9 +124,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body>
-          <WalletProvider>{children}</WalletProvider>
-        </body>
+      <body>{children}</body>
     </html>
   );
 }

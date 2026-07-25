@@ -16,12 +16,48 @@ function getStartDate(range: string): Date {
   return new Date(now.getTime() - (ms[range] || ms['24h']));
 }
 
+/** Fallback chart from DeFiLlama Privacy Cash (+ Umbra ownership is not historical public) */
+async function llamaFallback(
+  startDate: Date,
+  endDate: Date
+): Promise<
+  { timestamp: string; totalTvl: number; protocols: Record<string, number> }[]
+> {
+  try {
+    const res = await fetch('https://api.llama.fi/protocol/privacy-cash', {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const tvlArr: { date: number; totalLiquidityUSD: number }[] =
+      data?.tvl || [];
+    const start = startDate.getTime() / 1000;
+    const end = endDate.getTime() / 1000;
+    return tvlArr
+      .filter((p) => p.date >= start && p.date <= end)
+      .map((p) => ({
+        timestamp: new Date(p.date * 1000).toISOString(),
+        totalTvl: p.totalLiquidityUSD,
+        protocols: { 'Privacy Cash': p.totalLiquidityUSD },
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const range = searchParams.get('range') || '24h';
 
   const now = new Date();
   const startDate = getStartDate(range);
+
+  let history: {
+    timestamp: string;
+    totalTvl: number;
+    protocols: Record<string, number>;
+  }[] = [];
+  let source: 'turso' | 'defillama' | 'empty' = 'empty';
 
   try {
     const data = await getAllProtocolsTvlHistory(
@@ -39,30 +75,34 @@ export async function GET(request: NextRequest) {
       if (!aggregated[ts]) {
         aggregated[ts] = { timestamp: ts, totalTvl: 0, protocols: {} };
       }
-      aggregated[ts].totalTvl += row.tvl_usd as number;
-      aggregated[ts].protocols[row.protocol_name as string] =
-        row.tvl_usd as number;
+      const v = Number(row.tvl_usd) || 0;
+      aggregated[ts].totalTvl += v;
+      aggregated[ts].protocols[row.protocol_name as string] = v;
     }
 
-    const history = Object.values(aggregated).sort((a, b) =>
+    history = Object.values(aggregated).sort((a, b) =>
       a.timestamp.localeCompare(b.timestamp)
     );
-
-    return NextResponse.json(
-      {
-        range,
-        startDate: startDate.toISOString(),
-        endDate: now.toISOString(),
-        dataPoints: history.length,
-        history,
-      },
-      { headers: { 'Cache-Control': 'public, max-age=300' } }
-    );
+    if (history.length) source = 'turso';
   } catch (error) {
-    console.error('Error fetching TVL history:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch TVL history' },
-      { status: 500 }
-    );
+    console.error('Turso TVL history failed:', error);
   }
+
+  if (!history.length) {
+    history = await llamaFallback(startDate, now);
+    if (history.length) source = 'defillama';
+  }
+
+  // Always 200 — UI treats empty history as "no chart yet", never hard-fail
+  return NextResponse.json(
+    {
+      range,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+      dataPoints: history.length,
+      history,
+      source,
+    },
+    { headers: { 'Cache-Control': 'public, max-age=120, s-maxage=120' } }
+  );
 }

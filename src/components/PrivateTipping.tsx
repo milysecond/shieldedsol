@@ -5,10 +5,11 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { VersionedTransaction, Connection } from '@solana/web3.js';
 import { MAGICBLOCK_API, USDC_MINT, SOLANA_CLUSTER, SOLANA_RPC } from '@/lib/constants';
+import WalletProvider from './WalletProvider';
 
 type Status = { type: 'idle' } | { type: 'pending'; message: string } | { type: 'success'; message: string } | { type: 'error'; message: string };
 
-export default function PrivateTipping() {
+function PrivateTippingInner() {
   const { publicKey, signTransaction, connected } = useWallet();
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
@@ -173,5 +174,13 @@ export default function PrivateTipping() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function PrivateTipping() {
+  return (
+    <WalletProvider>
+      <PrivateTippingInner />
+    </WalletProvider>
   );
 }

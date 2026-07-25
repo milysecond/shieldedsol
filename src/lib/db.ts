@@ -98,6 +98,7 @@ export async function saveTvlSnapshot(
   protocolName: string,
   tvlUsd: number
 ) {
+  if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) return;
   await execute(
     'INSERT INTO tvl_snapshots (timestamp, protocol_name, tvl_usd) VALUES (?, ?, ?)',
     [timestamp, protocolName, tvlUsd]
@@ -112,6 +113,7 @@ export async function savePoolBalance(
   balance: number,
   usdValue: number
 ) {
+  if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) return;
   await execute(
     'INSERT INTO pool_balances (timestamp, protocol_name, asset, address, balance, usd_value) VALUES (?, ?, ?, ?, ?, ?)',
     [timestamp, protocolName, asset, address, balance, usdValue]
@@ -123,6 +125,7 @@ export async function saveTokenPrice(
   symbol: string,
   usdPrice: number
 ) {
+  if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) return;
   await execute(
     'INSERT INTO token_prices (timestamp, symbol, usd_price) VALUES (?, ?, ?)',
     [timestamp, symbol, usdPrice]
