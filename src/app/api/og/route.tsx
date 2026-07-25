@@ -1,8 +1,6 @@
 import { ImageResponse } from 'next/og';
 import { SITE_URL } from '@/lib/constants';
 
-export const runtime = 'edge';
-
 export async function GET() {
   let tvl = '--';
   let change = '';

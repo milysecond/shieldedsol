@@ -6,8 +6,6 @@ import {
   saveTokenPrice,
 } from '@/lib/db';
 
-export const runtime = 'edge';
-
 export async function POST(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get('authorization');

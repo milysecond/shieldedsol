@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllProtocolsTvlHistory } from '@/lib/db';
 
-export const runtime = 'edge';
-
 function getStartDate(range: string): Date {
   const now = new Date();
   const ms: Record<string, number> = {

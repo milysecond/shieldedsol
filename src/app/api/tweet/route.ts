@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SITE_URL } from '@/lib/constants';
 
-export const runtime = 'edge';
-
 async function fetchTVL() {
   let tvlFormatted = '$--';
   let change = '';
