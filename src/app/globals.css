@@ -140,6 +140,10 @@ h1 {
   color: #22c55e;
   background: #22c55e10;
 }
+.status-infra {
+  color: #38bdf8;
+  background: #38bdf810;
+}
 .status-upcoming {
   color: #eab308;
   background: #eab30810;

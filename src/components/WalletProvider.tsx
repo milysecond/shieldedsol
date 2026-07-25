@@ -12,11 +12,12 @@ import { SOLANA_RPC } from '@/lib/constants';
 
 export default function WalletProvider({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => SOLANA_RPC, []);
+  // Only Phantom — avoid WalletConnect/pino bundle bloat on first paint
   const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <SolanaWalletProvider wallets={wallets} autoConnect>
+      <SolanaWalletProvider wallets={wallets} autoConnect={false}>
         <WalletModalProvider>{children}</WalletModalProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>

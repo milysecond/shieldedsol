@@ -11,7 +11,16 @@ export const MINTS = {
   stORE: 'sTorERYB6xAZ1SSbwpK3zoK2EEwbBrc7TZAzg1uCGiH',
   USD1: 'USD1ttGY1N17NEEHLmELoaybftRBUSErhqYYiQzvEmuB',
   ZSOL: 'zso1EF4k8HNteye34aD8w2Fm6pYVWMDgkgWCUrMLip1',
+  /** Arcium network token */
+  ARX: 'ARXwZkNAtzPfdcoqQiduJn8EPv9fKiDfGn2KyggyDrFs',
 } as const;
+
+/** Arcium on-chain staking program (operator stake accounts) */
+export const ARCIUM_STAKING_PROGRAM =
+  'ArcStnN9zZZVB5WjgPhLHjYpY7Gb29mzb96ySsb1kxgq';
+
+/** Operator stake account data length (bytes) */
+export const ARCIUM_OPERATOR_ACCOUNT_SIZE = 652;
 
 export const POOL_ADDRESSES = {
   PRIVACY_CASH_SOL: '4AV2Qzp3N4c9RfzyEbNZs2wqWfW4EwKnnxFAZCndvfGh',
@@ -31,15 +40,17 @@ export const PROTOCOL_DEFINITIONS = [
   {
     name: 'Umbra',
     status: 'live' as const,
-    url: 'https://app.arcium.com',
-    linkText: 'app.arcium.com',
-    pools: ['USD'],
+    url: 'https://app.umbraprivacy.com',
+    linkText: 'app.umbraprivacy.com',
+    // Dynamic pool list comes from ownership.umbraprivacy.com
+    pools: ['kmSOL', 'wSOL', 'USDC', 'USDT', 'UMBRA', 'ZINC', 'CASH', 'ARX', 'OTHER'],
   },
   {
     name: 'Arcium',
     status: 'live' as const,
-    url: 'https://arcium.com',
-    pools: [],
+    url: 'https://stake.arcium.com',
+    linkText: 'stake.arcium.com',
+    pools: ['ARX'],
   },
   {
     name: 'Light Protocol',
