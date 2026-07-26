@@ -59,6 +59,53 @@ function fmtUsd(n: number | null | undefined): string {
   return '$' + fmt(n);
 }
 
+function fmtUsdFull(n: number | null | undefined): string {
+  if (n == null || isNaN(n)) return '--';
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+function usdToSol(usd: number | null | undefined, solPrice: number): number | null {
+  if (usd == null || isNaN(usd) || !solPrice || solPrice <= 0) return null;
+  return usd / solPrice;
+}
+
+function fmtSol(n: number | null | undefined): string {
+  if (n == null || isNaN(n)) return '--';
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+  if (n >= 100) return n.toLocaleString('en-US', { maximumFractionDigits: 1 });
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function fmtSolFull(n: number | null | undefined): string {
+  if (n == null || isNaN(n)) return '--';
+  if (n >= 1000) {
+    return n.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  }
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+type DisplayUnit = 'sol' | 'usd';
+
+const DOT_ALPHAS = [0.95, 0.78, 0.62, 0.5, 0.4, 0.32, 0.26, 0.2, 0.16, 0.12];
+function segmentColor(i: number, _accent = false): string {
+  const a = DOT_ALPHAS[Math.min(i, DOT_ALPHAS.length - 1)];
+  // Purple segments read on both dark and light
+  return `rgba(124, 44, 255, ${a})`;
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<ProtocolsResponse | null>(null);
   const [chartHistory, setChartHistory] = useState<HistoryPoint[]>([]);
@@ -68,6 +115,9 @@ export default function Dashboard() {
   const [openCharts, setOpenCharts] = useState<
     Record<string, ProtocolHistoryPoint[]>
   >({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [unit, setUnit] = useState<DisplayUnit>('sol');
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -76,6 +126,7 @@ export default function Dashboard() {
   >('idle');
   const lastTvlRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const dataRef = useRef<ProtocolsResponse | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('theme');
@@ -85,6 +136,13 @@ export default function Dashboard() {
     }
     setAlertsEnabled(localStorage.getItem('alerts') === 'true');
     lastTvlRef.current = parseFloat(localStorage.getItem('lastTvl') || '0');
+    const savedUnit = localStorage.getItem('displayUnit');
+    if (savedUnit === 'usd' || savedUnit === 'sol') setUnit(savedUnit);
+  }, []);
+
+  const setDisplayUnit = useCallback((next: DisplayUnit) => {
+    setUnit(next);
+    localStorage.setItem('displayUnit', next);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -100,8 +158,12 @@ export default function Dashboard() {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    // Hard client timeout so UI never spins forever
-    const timer = setTimeout(() => ac.abort(), 25000);
+    let timedOut = false;
+    // Client cap — server should answer faster; ignore non-timeout aborts
+    const timer = setTimeout(() => {
+      timedOut = true;
+      ac.abort();
+    }, 18000);
 
     try {
       setError(null);
@@ -114,8 +176,17 @@ export default function Dashboard() {
         throw new Error(`API ${res.status}: ${body.slice(0, 120)}`);
       }
       const json: ProtocolsResponse = await res.json();
-      if (!json?.protocols?.length) throw new Error('Empty protocols payload');
+      // Prefer keeping previous good data over empty timeout shells
+      if (!json?.protocols?.length) {
+        if (abortRef.current !== ac) return;
+        if (!dataRef.current) throw new Error('Empty protocols payload');
+        return;
+      }
+      // Ignore if a newer request already started
+      if (abortRef.current !== ac) return;
+      dataRef.current = json;
       setData(json);
+      setError(null);
 
       const tvl = json.totalTvl;
       if (
@@ -138,15 +209,17 @@ export default function Dashboard() {
       localStorage.setItem('lastTvl', String(tvl));
       lastTvlRef.current = tvl;
     } catch (e) {
+      if (abortRef.current !== ac) return; // superseded
       if ((e as Error)?.name === 'AbortError') {
-        setError('Request timed out. Tap refresh.');
+        if (timedOut) setError('Request timed out. Tap refresh.');
+        // cleanup/unmount abort → silent
       } else {
         console.error('Fetch error:', e);
         setError(e instanceof Error ? e.message : 'Failed to load data');
       }
     } finally {
       clearTimeout(timer);
-      setLoading(false);
+      if (abortRef.current === ac) setLoading(false);
     }
   }, [alertsEnabled]);
 
@@ -241,15 +314,56 @@ export default function Dashboard() {
     [openCharts]
   );
 
+  const toggleExpanded = useCallback((protocolName: string) => {
+    setExpanded((prev) => ({ ...prev, [protocolName]: !prev[protocolName] }));
+  }, []);
+
   const getShareText = useCallback(() => {
-    const tvl = data ? fmtUsd(data.totalTvl) : '$--';
+    const solPrice = data?.solPrice || 0;
+    const fmtVal = (usd: number) =>
+      unit === 'sol'
+        ? `${fmtSol(usdToSol(usd, solPrice))} SOL`
+        : fmtUsd(usd);
+    const tvl = data ? fmtVal(data.totalTvl) : '--';
     const top = (data?.protocols || [])
       .filter((p) => p.kind !== 'infra' && p.tvl > 0)
-      .slice(0, 3)
-      .map((p) => `${p.name} ${fmtUsd(p.tvl)}`)
+      .slice(0, 4)
+      .map((p) => `${p.name} ${fmtVal(p.tvl)}`)
       .join(' · ');
-    return `Solana Privacy Pools TVL: ${tvl}${top ? `\n${top}` : ''}\n\nTrack live on shieldedsol.com`;
-  }, [data]);
+    return `Solana Privacy Pools TVL: ${tvl}${top ? `\n${top}` : ''}\n\nTrack live → https://shieldedsol.com`;
+  }, [data, unit]);
+
+  const shareUrl = 'https://shieldedsol.com';
+
+  const openShare = useCallback(
+    async (kind: 'x' | 'telegram' | 'copy') => {
+      const text = getShareText();
+      if (kind === 'x') {
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
+          '_blank',
+          'width=550,height=420'
+        );
+        return;
+      }
+      if (kind === 'telegram') {
+        window.open(
+          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`,
+          '_blank',
+          'width=550,height=420'
+        );
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1800);
+      } catch {
+        setCopied(false);
+      }
+    },
+    [getShareText]
+  );
 
   const handleSubscribe = useCallback(
     async (e: React.FormEvent) => {
@@ -319,493 +433,583 @@ export default function Dashboard() {
     }
   }, [data?.updatedAt]);
 
+  // Pool TVL only for composition bar (exclude infra like Arcium)
+  const poolProtocols = useMemo(
+    () =>
+      protocols.filter(
+        (p) => p.kind !== 'infra' && p.status === 'live' && p.tvl > 0
+      ),
+    [protocols]
+  );
+  const poolTvlSum = useMemo(
+    () => poolProtocols.reduce((s, p) => s + (p.tvl || 0), 0),
+    [poolProtocols]
+  );
+  const topShare =
+    poolTvlSum > 0 && poolProtocols[0]
+      ? (poolProtocols[0].tvl / poolTvlSum) * 100
+      : 0;
+
+  const solPrice = data?.solPrice || 0;
+  const fmtValue = useCallback(
+    (usd: number | null | undefined) => {
+      if (unit === 'usd') return fmtUsd(usd);
+      return fmtSol(usdToSol(usd, solPrice));
+    },
+    [unit, solPrice]
+  );
+  const fmtValueFull = useCallback(
+    (usd: number | null | undefined) => {
+      if (unit === 'usd') return fmtUsdFull(usd);
+      return fmtSolFull(usdToSol(usd, solPrice));
+    },
+    [unit, solPrice]
+  );
+  const heroTotalSol = data ? usdToSol(data.totalTvl, solPrice) : null;
+
+  const placeholders = [
+    'Privacy Cash',
+    'Umbra',
+    'Vanish Trade',
+    'Arcium',
+    'Turbine',
+    'Mixoor',
+    'Elusiv',
+  ];
+
   return (
-    <div className="container">
-      <header>
-        <div>
-          <h1>
-            <img src="/logo.svg" alt="Shielded Sol" className="logo" />
-            Shielded Sol
-          </h1>
-          <p className="tagline">
-            Solana Privacy Pools &middot;{' '}
-            <a
-              href="https://x.com/shieldedsol"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: 'var(--text3)', textDecoration: 'none' }}
+    <div className="app-shell">
+      {copied && <div className="copy-toast">Copied to clipboard</div>}
+      <header className="topbar">
+        <button
+          type="button"
+          className="topbar-brand"
+          title="Copy site URL"
+          onClick={() =>
+            navigator.clipboard.writeText('https://shieldedsol.com')
+          }
+        >
+          shielded.sol
+        </button>
+        <div className="topbar-right">
+          <div className="header-actions" aria-label="Actions">
+            <button
+              className="action-btn"
+              onClick={toggleTheme}
+              title="Toggle Theme"
+              type="button"
             >
-              @shieldedsol
-            </a>
-          </p>
-        </div>
-        <div className="header-actions">
-          <button
-            className="action-btn"
-            onClick={toggleTheme}
-            title="Toggle Theme"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            </button>
+            <button
+              className={`action-btn${alertsEnabled ? ' active' : ''}`}
+              onClick={toggleAlerts}
+              title="TVL Alerts"
+              type="button"
             >
-              <circle cx="12" cy="12" r="5" />
-              <line x1="12" y1="1" x2="12" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="23" />
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-              <line x1="1" y1="12" x2="3" y2="12" />
-              <line x1="21" y1="12" x2="23" y2="12" />
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-            </svg>
-          </button>
-          <button
-            className={`action-btn${alertsEnabled ? ' active' : ''}`}
-            onClick={toggleAlerts}
-            title="TVL Alerts"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </button>
+            <button
+              className="action-btn"
+              onClick={() => openShare('x')}
+              title="Share TVL on X"
+              type="button"
             >
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </button>
-          <button
-            className="action-btn"
-            onClick={() => {
-              const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(getShareText())}`;
-              window.open(url, '_blank', 'width=550,height=420');
-            }}
-            title="Share TVL on X"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-            </svg>
-          </button>
-          <button
-            className="action-btn"
-            onClick={() => {
-              const url = `https://t.me/share/url?url=${encodeURIComponent('https://shieldedsol.com')}&text=${encodeURIComponent(getShareText())}`;
-              window.open(url, '_blank', 'width=550,height=420');
-            }}
-            title="Share on Telegram"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-            </svg>
-          </button>
-          <button
-            className="action-btn"
-            onClick={async () => {
-              await navigator.clipboard.writeText(
-                getShareText() + '\nhttps://shieldedsol.com'
-              );
-            }}
-            title="Copy TVL Stats"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+            </button>
+            <button
+              className="action-btn"
+              onClick={() => openShare('telegram')}
+              title="Share on Telegram"
+              type="button"
             >
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-          </button>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+              </svg>
+            </button>
+            <button
+              className={`action-btn${copied ? ' active' : ''}`}
+              onClick={() => openShare('copy')}
+              title={copied ? 'Copied!' : 'Copy TVL stats'}
+              type="button"
+              aria-label={copied ? 'Copied' : 'Copy TVL stats'}
+            >
+              {copied ? (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              )}
+            </button>
+          </div>
+          <span className="live-pill">
+            <span className="live-dot" />
+            live
+          </span>
         </div>
       </header>
 
-      {error && (
-        <div
-          className="protocol"
-          style={{
-            border: '1px solid #ef4444',
-            borderRadius: 6,
-            padding: '0.75rem',
-            marginBottom: '1rem',
-          }}
-        >
-          <div style={{ color: '#ef4444', fontSize: '0.75rem', marginBottom: 6 }}>
-            {error}
+      <main className="hero-main">
+        <div className="hero">
+          <div className="hero-logo">
+            <div className="hero-glow" aria-hidden="true" />
+            <img
+              src="/logo.svg"
+              alt="Shielded Sol"
+              className="logo hero-logo-img"
+              width={88}
+              height={88}
+            />
           </div>
-          <button className="refresh" onClick={refresh}>
-            retry
-          </button>
-        </div>
-      )}
+          <h1 className="hero-title">Shielded Sol</h1>
+          <div
+            className={`hero-tvl${loading && !data ? ' loading-tvl' : ' revealed'}`}
+          >
+            {data ? (
+              <>
+                {unit === 'usd' ? (
+                  <span className="hero-currency">$</span>
+                ) : null}
+                {fmtValueFull(data.totalTvl)}
+                {unit === 'sol' ? (
+                  <span className="hero-unit">SOL</span>
+                ) : null}
+              </>
+            ) : loading ? (
+              '···'
+            ) : (
+              '--'
+            )}
+          </div>
 
-      <div className="total">
-        <div className="total-label">
-          Total Value Locked &middot;{' '}
-          <span>
-            {data
-              ? `SOL $${data.solPrice.toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`
-              : 'SOL $--'}
-          </span>
+          <div
+            className="unit-toggle"
+            role="group"
+            aria-label="Display unit"
+          >
+            <button
+              type="button"
+              className={`unit-btn${unit === 'sol' ? ' active' : ''}`}
+              onClick={() => setDisplayUnit('sol')}
+              aria-pressed={unit === 'sol'}
+            >
+              SOL
+            </button>
+            <button
+              type="button"
+              className={`unit-btn${unit === 'usd' ? ' active' : ''}`}
+              onClick={() => setDisplayUnit('usd')}
+              aria-pressed={unit === 'usd'}
+            >
+              USD
+            </button>
+            <span
+              className={`unit-thumb${unit === 'usd' ? ' right' : ''}`}
+              aria-hidden
+            />
+          </div>
+
+          <div className="comp-bar-wrap">
+            <div className="comp-bar" role="img" aria-label="TVL composition">
+              {loading && !data
+                ? [55, 25, 12, 5, 3].map((w, i) => (
+                    <div
+                      key={i}
+                      className="comp-seg"
+                      style={{
+                        width: `${w}%`,
+                        backgroundColor: segmentColor(i, true),
+                        opacity: 0.35,
+                      }}
+                    />
+                  ))
+                : poolProtocols.map((p, i) => {
+                    const w =
+                      poolTvlSum > 0 ? (p.tvl / poolTvlSum) * 100 : 0;
+                    if (w < 0.05) return null;
+                    return (
+                      <div
+                        key={p.name}
+                        className="comp-seg"
+                        title={`${p.name} ${w.toFixed(1)}%`}
+                        style={{
+                          width: `${w}%`,
+                          backgroundColor: segmentColor(i, true),
+                        }}
+                      />
+                    );
+                  })}
+            </div>
+            <p className="comp-meta">
+              {data ? (
+                <>
+                  {topShare.toFixed(1)}% {poolProtocols[0]?.name || ''}
+                  {data.solPrice
+                    ? unit === 'sol'
+                      ? ` · 1 SOL = $${data.solPrice.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : ` · ${fmtSol(heroTotalSol)} SOL`
+                    : ''}
+                  {tvlChangeText ? (
+                    <span className={`tvl-change ${tvlChangeClass}`}>
+                      {' '}
+                      · {tvlChangeText}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                'loading composition…'
+              )}
+            </p>
+          </div>
         </div>
-        <div
-          className={`total-value${loading && !data ? ' loading-tvl' : ' revealed'}`}
-        >
-          {data ? fmtUsd(data.totalTvl) : loading ? '' : '$--'}
-        </div>
-        {tvlChangeText && (
-          <div className={`tvl-change ${tvlChangeClass}`}>{tvlChangeText}</div>
+
+        {error && (
+          <div className="error-banner">
+            <div>{error}</div>
+            <button className="refresh" onClick={refresh}>
+              retry
+            </button>
+          </div>
         )}
-      </div>
 
-      <div className="chart">
-        <div className="chart-header">
-          <div className="chart-title">TVL History</div>
-          <div className="chart-tabs">
-            {[7, 30, 90].map((d) => (
-              <button
-                key={d}
-                className={`chart-tab${chartPeriod === d ? ' active' : ''}`}
-                onClick={() => handleSetChartPeriod(d)}
-              >
-                {d}D
-              </button>
-            ))}
+        <div className="proto-table">
+          <div className="proto-head">
+            <span />
+            <span>Protocol</span>
+            <span className="num">Status</span>
+            <span className="num">{unit === 'sol' ? 'SOL' : 'USD'}</span>
           </div>
-        </div>
-        <div className="chart-container">
-          {chartHistory.length > 0
-            ? chartHistory.map((point, i) => {
-                const h = chartMax > 0 ? (point.totalTvl / chartMax) * 100 : 0;
-                return (
-                  <div
-                    key={i}
-                    className="chart-bar revealed"
-                    style={{ height: `${h}%`, animationDelay: `${i * 0.03}s` }}
-                    title={fmtUsd(point.totalTvl)}
-                  />
+          {(loading && !data ? placeholders : protocols).map((p, idx) => {
+            const isPlaceholder = typeof p === 'string';
+            const name = isPlaceholder ? p : p.name;
+            const protocol = isPlaceholder ? null : p;
+            const isInfra = protocol?.kind === 'infra';
+            const status = protocol?.status || 'live';
+            const statusText = isInfra
+              ? 'INFRA'
+              : status === 'live'
+                ? 'LIVE'
+                : status === 'upcoming'
+                  ? 'SOON'
+                  : 'SUNSET';
+            const tvl = protocol?.tvl;
+            const share =
+              data &&
+              protocol &&
+              poolTvlSum > 0 &&
+              !isInfra &&
+              protocol.tvl > 0
+                ? (protocol.tvl / poolTvlSum) * 100
+                : null;
+            const isChartOpen = name in openCharts;
+            const chartData = openCharts[name] || [];
+            const isOpen = !!expanded[name];
+            const protoChartMax =
+              chartData.length > 0
+                ? Math.max(...chartData.map((d) => d.tvl))
+                : 0;
+            const pools = protocol?.pools || [];
+            const stats = protocol?.stats;
+            const dotI = isInfra
+              ? 4
+              : Math.max(
+                  0,
+                  poolProtocols.findIndex((x) => x.name === name)
                 );
-              })
-            : loading
-              ? Array.from({ length: 12 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="chart-bar loading-bar"
+            const hasDetails =
+              !isPlaceholder &&
+              (!!stats || pools.length > 0 || !!protocol);
+
+            return (
+              <div
+                key={name}
+                className={`proto-block${isOpen ? ' open' : ''}`}
+              >
+                <button
+                  type="button"
+                  className={`proto-row${isPlaceholder ? ' muted' : ''}`}
+                  onClick={() => {
+                    if (!isPlaceholder) toggleExpanded(name);
+                  }}
+                  aria-expanded={isOpen}
+                  disabled={isPlaceholder}
+                >
+                  <span
+                    className="proto-dot"
                     style={{
-                      height: `${30 + ((i * 17) % 40)}%`,
-                      animationDelay: `${i * 0.05}s`,
+                      backgroundColor: segmentColor(
+                        dotI < 0 ? idx : dotI,
+                        true
+                      ),
                     }}
                   />
-                ))
-              : (
-                <div
-                  style={{
-                    color: 'var(--text5)',
-                    fontSize: '0.65rem',
-                    padding: '1rem 0',
-                    width: '100%',
-                    textAlign: 'center',
-                  }}
-                >
-                  No history yet — live TVL still updates above
-                </div>
-              )}
-        </div>
-        <div className="chart-labels">
-          <span className="chart-label">{chartStartLabel}</span>
-          <span className="chart-label">{chartEndLabel}</span>
-        </div>
-      </div>
-
-      <div>
-        {(loading && !data
-          ? [
-              'Privacy Cash',
-              'Umbra',
-              'Vanish Trade',
-              'Arcium',
-              'Turbine',
-              'Mixoor',
-              'Elusiv',
-            ]
-          : protocols
-        ).map((p) => {
-          const isPlaceholder = typeof p === 'string';
-          const name = isPlaceholder ? p : p.name;
-          const protocol = isPlaceholder ? null : p;
-          const status = protocol?.status || 'live';
-          const isInfra = protocol?.kind === 'infra';
-          const statusClass = isInfra
-            ? 'status-infra'
-            : 'status-' + status;
-          const statusText = isInfra
-            ? 'INFRA'
-            : status === 'live'
-              ? 'LIVE'
-              : status === 'upcoming'
-                ? 'SOON'
-                : 'SUNSET';
-          const tvl = protocol?.tvl;
-          const stats = protocol?.stats;
-          const isChartOpen = name in openCharts;
-          const chartData = openCharts[name] || [];
-          const protoChartMax =
-            chartData.length > 0
-              ? Math.max(...chartData.map((d) => d.tvl))
-              : 0;
-          const pools = protocol?.pools || [];
-          const share =
-            data && protocol && data.totalTvl > 0 && protocol.kind !== 'infra'
-              ? (protocol.tvl / data.totalTvl) * 100
-              : null;
-
-          return (
-            <div key={name} className="protocol">
-              <div className="protocol-header">
-                <span className="protocol-name">
-                  {name}
-                  {!isPlaceholder && protocol?.kind === 'infra' ? (
-                    <span
-                      className="protocol-tvl revealed"
-                      style={{ color: 'var(--text3)', marginLeft: 8 }}
-                    >
-                      · network
-                    </span>
-                  ) : tvl != null ? (
-                    <span className="protocol-tvl revealed" style={{ marginLeft: 8 }}>
-                      {fmtUsd(tvl)}
-                    </span>
-                  ) : loading ? (
-                    <span className="loading" style={{ marginLeft: 8 }} />
-                  ) : null}
-                  {share != null && share >= 0.05 && (
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        color: 'var(--text4)',
-                        fontSize: '0.65rem',
-                        fontWeight: 400,
-                      }}
-                    >
-                      {share.toFixed(1)}%
-                    </span>
-                  )}
-                </span>
-                <span className={`protocol-status ${statusClass}`}>
-                  {statusText}
-                </span>
-              </div>
-              {stats && (
-                <div
-                  className="revealed"
-                  style={{
-                    color: 'var(--text3)',
-                    fontSize: '0.65rem',
-                    margin: '0.15rem 0 0.35rem',
-                    lineHeight: 1.35,
-                  }}
-                >
-                  {stats}
-                </div>
-              )}
-              {pools.length > 0 && (
-                <div className="pools">
-                  {pools.map((pool) => (
-                    <div key={pool.asset} className="pool">
-                      <span className="pool-asset">{pool.asset}</span>
-                      <div className="pool-balance">
-                        <div className="pool-usd">
-                          <span
-                            className="revealed"
-                            style={{ animationDelay: '0.15s' }}
-                          >
-                            {fmtUsd(pool.usd)}
-                          </span>
-                        </div>
-                        <div className="pool-amount">
-                          <span className="revealed">
-                            {fmt(pool.balance, 2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {!isPlaceholder && (
-                <>
-                  <button
-                    className={`protocol-chart-toggle${isChartOpen ? ' open' : ''}`}
-                    onClick={() => toggleProtocolChart(name)}
+                  <span className="proto-name">
+                    {name}
+                    {share != null && share >= 0.5 && (
+                      <span className="proto-share">{share.toFixed(1)}%</span>
+                    )}
+                  </span>
+                  <span
+                    className={`proto-status num status-${isInfra ? 'infra' : status}`}
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                    {isChartOpen ? 'Hide history' : 'View history'}
-                  </button>
-                  {isChartOpen && (
-                    <div className="protocol-chart open">
-                      <div className="protocol-chart-container">
-                        {chartData.length > 0 ? (
-                          chartData.map((d, i) => {
-                            const h =
-                              protoChartMax > 0
-                                ? (d.tvl / protoChartMax) * 100
-                                : 0;
-                            return (
-                              <div
-                                key={i}
-                                className="protocol-chart-bar revealed"
-                                style={{
-                                  height: `${h}%`,
-                                  animationDelay: `${i * 0.02}s`,
-                                }}
-                                title={fmtUsd(d.tvl)}
-                              />
-                            );
-                          })
-                        ) : (
-                          <div
-                            style={{
-                              color: 'var(--text5)',
-                              fontSize: '0.625rem',
-                              padding: '0.5rem 0',
-                            }}
-                          >
-                            No historical data yet
+                    {loading && !protocol ? '···' : statusText}
+                  </span>
+                  <span className="proto-usd num">
+                    {isInfra
+                      ? '—'
+                      : tvl != null
+                        ? fmtValue(tvl)
+                        : loading
+                          ? '···'
+                          : '—'}
+                    {hasDetails && (
+                      <span
+                        className={`proto-chevron${isOpen ? ' open' : ''}`}
+                        aria-hidden
+                      >
+                        ▾
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {isOpen && !isPlaceholder && protocol && (
+                  <div className="proto-details">
+                    {stats && <div className="proto-stats">{stats}</div>}
+                    {pools.length > 0 && (
+                      <div className="proto-pools">
+                        {pools.map((pool) => (
+                          <div key={pool.asset} className="proto-pool-chip">
+                            <span>{pool.asset}</span>
+                            <span className="num">{fmtValue(pool.usd)}</span>
                           </div>
-                        )}
+                        ))}
                       </div>
+                    )}
+                    <div className="proto-actions">
+                      {protocol.url && (
+                        <a
+                          href={protocol.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="protocol-link"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {protocol.linkText ||
+                            protocol.url.replace(/^https?:\/\//, '')}
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        className={`protocol-chart-toggle${isChartOpen ? ' open' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleProtocolChart(name);
+                        }}
+                      >
+                        {isChartOpen ? 'Hide history' : 'View history'}
+                      </button>
+                      {isChartOpen && (
+                        <div className="protocol-chart open">
+                          <div className="protocol-chart-container">
+                            {chartData.length > 0 ? (
+                              chartData.map((d, i) => {
+                                const h =
+                                  protoChartMax > 0
+                                    ? (d.tvl / protoChartMax) * 100
+                                    : 0;
+                                return (
+                                  <div
+                                    key={i}
+                                    className="protocol-chart-bar revealed"
+                                    style={{
+                                      height: `${h}%`,
+                                      animationDelay: `${i * 0.02}s`,
+                                    }}
+                                    title={fmtValue(d.tvl)}
+                                  />
+                                );
+                              })
+                            ) : (
+                              <div className="empty-note">
+                                No historical data yet
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <a
-                    href={protocol!.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="protocol-link"
-                  >
-                    {protocol!.linkText ||
-                      protocol!.url.replace(/^https?:\/\//, '')}
-                  </a>
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="protocol" style={{ marginTop: '1rem' }}>
-        <div className="protocol-header">
-          <span className="protocol-name">Stay updated</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-        {subscribeState === 'success' ? (
-          <p
-            style={{
-              color: 'var(--accent)',
-              fontSize: '0.75rem',
-              margin: '0.5rem 0',
-            }}
-          >
-            Subscribed! We&apos;ll notify you of major TVL changes.
-          </p>
-        ) : (
-          <form
-            onSubmit={handleSubscribe}
-            style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}
-          >
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              required
-              style={{
-                flex: 1,
-                background: 'var(--bg2)',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                padding: '0.4rem 0.6rem',
-                color: 'var(--text1, var(--text))',
-                fontSize: '16px',
-                outline: 'none',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={subscribeState === 'loading'}
-              style={{
-                background: 'var(--accent)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                padding: '0.4rem 0.75rem',
-                fontSize: '0.75rem',
-                cursor: subscribeState === 'loading' ? 'wait' : 'pointer',
-                opacity: subscribeState === 'loading' ? 0.7 : 1,
-              }}
-            >
-              {subscribeState === 'loading' ? '...' : 'Subscribe'}
+
+        <div className="chart chart-panel">
+          <div className="chart-header">
+            <div className="chart-title">TVL History</div>
+            <div className="chart-tabs">
+              {[7, 30, 90].map((d) => (
+                <button
+                  key={d}
+                  className={`chart-tab${chartPeriod === d ? ' active' : ''}`}
+                  onClick={() => handleSetChartPeriod(d)}
+                >
+                  {d}D
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="chart-container">
+            {chartHistory.length > 0
+              ? chartHistory.map((point, i) => {
+                  const h =
+                    chartMax > 0 ? (point.totalTvl / chartMax) * 100 : 0;
+                  return (
+                    <div
+                      key={i}
+                      className="chart-bar revealed"
+                      style={{ height: `${h}%`, animationDelay: `${i * 0.03}s` }}
+                      title={fmtValue(point.totalTvl)}
+                    />
+                  );
+                })
+              : loading
+                ? Array.from({ length: 12 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="chart-bar loading-bar"
+                      style={{
+                        height: `${30 + ((i * 17) % 40)}%`,
+                        animationDelay: `${i * 0.05}s`,
+                      }}
+                    />
+                  ))
+                : (
+                  <div className="empty-note">No history yet</div>
+                )}
+          </div>
+          <div className="chart-labels">
+            <span className="chart-label">{chartStartLabel}</span>
+            <span className="chart-label">{chartEndLabel}</span>
+          </div>
+        </div>
+
+        <div className="follow-row">
+          <div className="share-row" aria-label="Share">
+            <button type="button" className="share-chip" onClick={() => openShare('x')}>
+              Share on X
             </button>
-          </form>
-        )}
-        {subscribeState === 'error' && (
-          <p
-            style={{
-              color: '#ef4444',
-              fontSize: '0.7rem',
-              margin: '0.25rem 0 0',
-            }}
-          >
-            Something went wrong. Try again.
-          </p>
-        )}
-      </div>
-
-      <PrivateTipping />
-
-      <footer>
-        <button className="refresh" onClick={refresh}>
-          refresh
-        </button>
-        <span>
-          {' '}
-          &middot; {updatedLabel}
-          {data?.cached ? ' · cached' : ''}
-        </span>
-        <span style={{ float: 'right' }}>
-          <a href="/history">history</a> &middot;{' '}
+            <button type="button" className="share-chip" onClick={() => openShare('telegram')}>
+              Telegram
+            </button>
+            <button type="button" className={`share-chip${copied ? ' done' : ''}`} onClick={() => openShare('copy')}>
+              {copied ? 'Copied!' : 'Copy stats'}
+            </button>
+          </div>
           <a
+            className="follow-btn"
             href="https://x.com/shieldedsol"
             target="_blank"
             rel="noopener noreferrer"
           >
-            @shieldedsol
-          </a>{' '}
-          &middot;{' '}
+            Follow @shieldedsol
+          </a>
+        </div>
+
+        <div className="subscribe-panel">
+          {subscribeState === 'success' ? (
+            <p className="subscribe-ok">Subscribed — we&apos;ll ping major TVL moves.</p>
+          ) : (
+            <form onSubmit={handleSubscribe} className="subscribe-form">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+              />
+              <button type="submit" disabled={subscribeState === 'loading'}>
+                {subscribeState === 'loading' ? '...' : 'Subscribe'}
+              </button>
+            </form>
+          )}
+          {subscribeState === 'error' && (
+            <p className="subscribe-err">Something went wrong. Try again.</p>
+          )}
+        </div>
+
+        <PrivateTipping />
+      </main>
+
+      <footer className="site-footer">
+        <div className="footer-left">
+          <button className="refresh" onClick={refresh}>
+            refresh
+          </button>
+          <span>
+            {updatedLabel}
+            {data?.cached ? ' · cached' : ''}
+          </span>
+        </div>
+        <div className="footer-right">
+          <a href="/history">history</a>
           <a
             href="https://t.me/metasal"
             target="_blank"
             rel="noopener noreferrer"
           >
             + add protocol
-          </a>{' '}
-          &middot;{' '}
+          </a>
           <a
             href="https://metasal.xyz"
             target="_blank"
@@ -813,7 +1017,7 @@ export default function Dashboard() {
           >
             metasal.xyz
           </a>
-        </span>
+        </div>
       </footer>
     </div>
   );
