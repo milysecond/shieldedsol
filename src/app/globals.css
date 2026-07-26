@@ -1421,98 +1421,109 @@ footer a:hover {
   color: var(--text3);
 }
 
-/* ===== Tipping Widget ===== */
-.tipping-section {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
+/* ===== Donation ===== */
+.donation-section {
+  width: 100%;
+  max-width: 22rem;
+  margin: 1.25rem auto 0;
+  padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
-.tipping-title {
-  font-size: 0.875rem;
+.donation-title {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text3);
+  margin-bottom: 0.4rem;
+  text-align: center;
   font-weight: 600;
-  margin-bottom: 0.75rem;
+}
+.donation-card {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+}
+.donation-label {
+  font-size: 0.58rem;
+  color: var(--text3);
+  margin-bottom: 0.35rem;
+}
+.donation-address {
+  width: 100%;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
-}
-.tipping-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
+  padding: 0.45rem 0.55rem;
   border-radius: 8px;
-  padding: 1rem;
-}
-.tipping-input {
-  width: 100%;
-  background: var(--bg3);
-  border: 1px solid var(--border);
+  border: 1px solid var(--chip-border);
+  background: var(--surface);
   color: var(--text);
-  font-family: inherit;
-  font-size: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-  outline: none;
-}
-.tipping-input:focus {
-  border-color: var(--accent);
-}
-.tipping-input::placeholder {
-  color: var(--text4);
-}
-.tipping-row {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-.tipping-btn {
-  background: var(--accent);
-  border: none;
-  color: #fff;
-  font-family: inherit;
-  font-size: 0.75rem;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  font: inherit;
+  font-size: 0.65rem;
   cursor: pointer;
-  font-weight: 500;
-  width: 100%;
+  text-align: left;
+  transition: border-color 0.2s, background 0.2s;
 }
-.tipping-btn:hover {
-  opacity: 0.9;
+.donation-address:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover);
 }
-.tipping-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.donation-address.copied {
+  border-color: var(--live);
 }
-.tipping-status {
-  font-size: 0.625rem;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  border-radius: 4px;
+.donation-full {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.tipping-status.success {
-  color: #22c55e;
-  background: #22c55e10;
+.donation-short {
+  display: none;
+  font-variant-numeric: tabular-nums;
 }
-.tipping-status.error {
-  color: #ef4444;
-  background: #ef444410;
-}
-.tipping-status.pending {
+.donation-copy {
+  flex-shrink: 0;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--accent);
-  background: rgba(153, 69, 255, 0.1);
+  font-weight: 600;
 }
-.tipping-label {
-  font-size: 0.625rem;
+.donation-address.copied .donation-copy {
+  color: var(--live);
+}
+.donation-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+  justify-content: center;
+}
+.donation-link {
+  font-size: 0.62rem;
   color: var(--text3);
-  margin-bottom: 0.25rem;
+  text-decoration: none;
 }
-.tipping-note {
-  font-size: 0.5rem;
-  color: var(--text4);
-  margin-top: 0.5rem;
+.donation-link:hover {
+  color: var(--accent);
+}
+@media (max-width: 640px) {
+  .donation-section {
+    max-width: 100%;
+  }
+  .donation-full {
+    display: none;
+  }
+  .donation-short {
+    display: inline;
+    flex: 1;
+  }
 }
 
-/* Wallet adapter overrides */
+/* Wallet adapter overrides (unused after tip removal) */
 .wallet-adapter-button {
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 0.75rem !important;

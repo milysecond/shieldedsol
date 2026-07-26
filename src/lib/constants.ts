@@ -85,8 +85,9 @@ export const PROTOCOL_DEFINITIONS = [
   },
 ];
 
-// MagicBlock Payments
-export const MAGICBLOCK_API = 'https://payments.magicblock.app';
-export const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-export const SOLANA_CLUSTER = 'mainnet';
+// Shared Solana RPC (Helius)
 export const SOLANA_RPC = 'https://viviyan-bkj12u-fast-mainnet.helius-rpc.com';
+
+/** Public donation address for Shielded Sol */
+export const DONATION_WALLET =
+  'shLDydVFjPS6zyYo1WJ6JAVeqHf2PAxa2jiLDb8Tudt';

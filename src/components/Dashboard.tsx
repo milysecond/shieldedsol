@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import dynamic from 'next/dynamic';
-
-const PrivateTipping = dynamic(() => import('./PrivateTipping'), {
-  ssr: false,
-  loading: () => null,
-});
+import DonationWallet from './DonationWallet';
 
 interface Pool {
   asset: string;
@@ -988,7 +983,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        <PrivateTipping />
+        <DonationWallet />
       </main>
 
       <footer className="site-footer">
