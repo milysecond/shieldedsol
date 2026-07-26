@@ -23,7 +23,7 @@ export const metadata: Metadata = {
         url: '/api/og',
         width: 1200,
         height: 630,
-        alt: 'Shielded Sol dashboard showing Total Value Locked in Solana privacy pools',
+        alt: 'Shielded Sol — live Solana privacy pool TVL with SOL and USD totals',
         type: 'image/png',
       },
     ],
@@ -34,7 +34,14 @@ export const metadata: Metadata = {
     title: `${SITE_NAME} - Real-Time Solana Privacy Pool Tracker`,
     description:
       'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
-    images: ['/api/og'],
+    images: [
+      {
+        url: '/api/og',
+        width: 1200,
+        height: 630,
+        alt: 'Shielded Sol — live Solana privacy pool TVL',
+      },
+    ],
   },
   icons: {
     icon: [
@@ -63,6 +70,10 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="canonical" href={`${SITE_URL}/`} />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

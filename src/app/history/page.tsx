@@ -115,11 +115,19 @@ export default function HistoryPage() {
 
   return (
     <div className="history-container" style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <header className="history-header">
-        <h1>
-          <img src="/logo.svg" alt="Shielded Sol" className="logo" style={{ width: 32, height: 32 }} />
-          TVL History
-        </h1>
+      <header className="history-header site-header">
+        <div className="brand">
+          <img
+            src="/logo.svg"
+            alt=""
+            className="logo hero-logo-img history-logo"
+            width={48}
+            height={48}
+          />
+          <div className="brand-text">
+            <h1>TVL History</h1>
+          </div>
+        </div>
         <a href="/" className="back-link">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M19 12H5M12 19l-7-7 7-7" />

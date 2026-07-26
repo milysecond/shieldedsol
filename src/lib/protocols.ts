@@ -38,7 +38,7 @@ const UMBRA_DISPLAY_ASSETS = [
 let cache: { at: number; data: ProtocolsResponse } | null = null;
 const CACHE_TTL_MS = 45_000;
 
-async function rpcCall(method: string, params: unknown[]) {
+async function rpcCall(method: string, params: unknown[], timeoutMs = 4000) {
   const body = JSON.stringify({ method, jsonrpc: '2.0', params, id: '1' });
   for (const url of RPC_URLS) {
     try {
@@ -46,7 +46,7 @@ async function rpcCall(method: string, params: unknown[]) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (res.ok) {
         const data = await res.json();
@@ -257,14 +257,19 @@ async function fetchArciumStakedArx(): Promise<{
   stakedArx: number;
   operators: number;
 }> {
-  const data = await rpcCall('getProgramAccounts', [
-    ARCIUM_STAKING_PROGRAM,
-    {
-      encoding: 'base64',
-      filters: [{ dataSize: ARCIUM_OPERATOR_ACCOUNT_SIZE }],
-      commitment: 'confirmed',
-    },
-  ]);
+  // Heavy call — short timeout, first healthy RPC only path is enough
+  const data = await rpcCall(
+    'getProgramAccounts',
+    [
+      ARCIUM_STAKING_PROGRAM,
+      {
+        encoding: 'base64',
+        filters: [{ dataSize: ARCIUM_OPERATOR_ACCOUNT_SIZE }],
+        commitment: 'confirmed',
+      },
+    ],
+    6000
+  );
 
   const accounts: Array<{ account?: { data?: [string, string] } }> =
     data?.result || [];
@@ -655,7 +660,30 @@ export async function fetchProtocolsData(): Promise<ProtocolsResponse> {
     return { ...cache.data, cached: true };
   }
 
-  const data = await buildProtocolsData();
-  cache = { at: Date.now(), data };
-  return { ...data, cached: false };
+  try {
+    const data = await Promise.race([
+      buildProtocolsData(),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('protocols build timeout')), 12_000);
+      }),
+    ]);
+    cache = { at: Date.now(), data };
+    return { ...data, cached: false };
+  } catch (err) {
+    console.error('fetchProtocolsData failed:', err);
+    // Serve last good payload rather than hard-failing the UI
+    if (cache?.data) {
+      return { ...cache.data, cached: true };
+    }
+    // Minimal empty shell so client can still render
+    return {
+      solPrice: 0,
+      bonkPrice: 0,
+      orePrice: 0,
+      totalTvl: 0,
+      protocols: [],
+      updatedAt: new Date().toISOString(),
+      cached: false,
+    };
+  }
 }
