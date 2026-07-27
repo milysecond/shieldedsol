@@ -1,8 +1,14 @@
-// Raw fetch client for Turso /v2/pipeline — works on CF Pages edge runtime
+// Raw fetch client for Turso /v2/pipeline — works on CF Workers / edge
 // (unlike @libsql/client which requires Node.js APIs)
 
 interface TursoRow {
   [key: string]: string | number | null;
+}
+
+interface TursoCell {
+  type?: string;
+  value?: string | number | null;
+  base64?: string;
 }
 
 interface TursoResult {
@@ -12,9 +18,10 @@ interface TursoResult {
       type: string;
       result?: {
         cols: { name: string }[];
-        rows: (string | number | null)[][];
+        rows: (TursoCell | string | number | null)[][];
       };
     };
+    error?: { message?: string };
   }[];
 }
 
@@ -29,6 +36,40 @@ function getTursoConfig() {
   return { url: httpUrl, token };
 }
 
+function unwrapCell(cell: TursoCell | string | number | null): string | number | null {
+  if (cell == null) return null;
+  if (typeof cell !== 'object') return cell;
+  const t = cell.type;
+  const v = cell.value;
+  if (v == null && cell.base64 == null) return null;
+  if (t === 'null') return null;
+  if (t === 'integer' || t === 'float') {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  // text / blob / default
+  return v == null ? null : String(v);
+}
+
+type TursoArg =
+  | { type: 'null' }
+  | { type: 'integer'; value: string }
+  | { type: 'float'; value: number }
+  | { type: 'text'; value: string };
+
+function toArg(a: string | number | null): TursoArg {
+  if (a === null) return { type: 'null' };
+  if (typeof a === 'number') {
+    if (!Number.isFinite(a)) return { type: 'null' };
+    // Whole numbers as integer strings; floats as JSON numbers (Turso rejects string f64)
+    if (Number.isInteger(a) && Math.abs(a) <= Number.MAX_SAFE_INTEGER) {
+      return { type: 'integer', value: String(Math.trunc(a)) };
+    }
+    return { type: 'float', value: a };
+  }
+  return { type: 'text', value: String(a) };
+}
+
 async function executePipeline(
   statements: { sql: string; args?: (string | number | null)[] }[]
 ): Promise<TursoRow[][]> {
@@ -39,15 +80,7 @@ async function executePipeline(
       type: 'execute' as const,
       stmt: {
         sql: stmt.sql,
-        args: (stmt.args || []).map((a) => {
-          if (a === null) return { type: 'null' as const, value: null };
-          if (typeof a === 'number') return { type: 'float' as const, value: String(a) };
-          // Check if string is a numeric value (from API responses)
-          if (typeof a === 'string' && !isNaN(Number(a)) && a.trim() !== '') {
-            return { type: 'float' as const, value: a };
-          }
-          return { type: 'text' as const, value: String(a) };
-        }),
+        args: (stmt.args || []).map(toArg),
       },
     })),
     { type: 'close' as const },
@@ -69,15 +102,22 @@ async function executePipeline(
 
   const data = (await res.json()) as TursoResult;
 
+  // Surface first SQL error if present
+  for (const r of data.results || []) {
+    if (r.type === 'error') {
+      throw new Error(r.error?.message || 'Turso execute error');
+    }
+  }
+
   return data.results
     .filter((r) => r.type === 'ok' && r.response?.type === 'execute')
     .map((r) => {
       const result = r.response!.result!;
       const cols = result.cols.map((c) => c.name);
-      return result.rows.map((row) => {
+      return (result.rows || []).map((row) => {
         const obj: TursoRow = {};
         cols.forEach((col, i) => {
-          obj[col] = row[i];
+          obj[col] = unwrapCell(row[i] as TursoCell);
         });
         return obj;
       });
@@ -92,13 +132,17 @@ async function execute(
   return results[0] || [];
 }
 
+export function hasTurso(): boolean {
+  return !!(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN);
+}
+
 // Write operations
 export async function saveTvlSnapshot(
   timestamp: string,
   protocolName: string,
   tvlUsd: number
 ) {
-  if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) return;
+  if (!hasTurso()) return;
   await execute(
     'INSERT INTO tvl_snapshots (timestamp, protocol_name, tvl_usd) VALUES (?, ?, ?)',
     [timestamp, protocolName, tvlUsd]
@@ -113,7 +157,7 @@ export async function savePoolBalance(
   balance: number,
   usdValue: number
 ) {
-  if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) return;
+  if (!hasTurso()) return;
   await execute(
     'INSERT INTO pool_balances (timestamp, protocol_name, asset, address, balance, usd_value) VALUES (?, ?, ?, ?, ?, ?)',
     [timestamp, protocolName, asset, address, balance, usdValue]
@@ -125,7 +169,7 @@ export async function saveTokenPrice(
   symbol: string,
   usdPrice: number
 ) {
-  if (!process.env.TURSO_DATABASE_URL || !process.env.TURSO_AUTH_TOKEN) return;
+  if (!hasTurso()) return;
   await execute(
     'INSERT INTO token_prices (timestamp, symbol, usd_price) VALUES (?, ?, ?)',
     [timestamp, symbol, usdPrice]
@@ -174,7 +218,36 @@ export async function getPoolHistory(
 
 export async function getLatestTvlByProtocol() {
   return execute(
-    `SELECT protocol_name, tvl_usd, timestamp, MAX(timestamp) as latest_timestamp
-     FROM tvl_snapshots GROUP BY protocol_name ORDER BY tvl_usd DESC`
+    `SELECT t.protocol_name, t.tvl_usd, t.timestamp
+     FROM tvl_snapshots t
+     INNER JOIN (
+       SELECT protocol_name, MAX(timestamp) AS mx
+       FROM tvl_snapshots
+       GROUP BY protocol_name
+     ) m ON m.protocol_name = t.protocol_name AND m.mx = t.timestamp
+     ORDER BY t.tvl_usd DESC`
   );
+}
+
+/** Health probe for ops */
+export async function tursoHealth(): Promise<{
+  ok: boolean;
+  rows?: number;
+  latest?: string | null;
+  error?: string;
+}> {
+  try {
+    if (!hasTurso()) return { ok: false, error: 'missing env' };
+    const rows = await execute(
+      `SELECT COUNT(*) AS c, MAX(timestamp) AS latest FROM tvl_snapshots`
+    );
+    const c = Number(rows[0]?.c || 0);
+    const latest = (rows[0]?.latest as string) || null;
+    return { ok: true, rows: c, latest };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
 }
