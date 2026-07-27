@@ -28,7 +28,15 @@ export const POOL_ADDRESSES = {
   VANISH_TRADE: '8MjKXQgj97NPVNhj9gJrQNP7BibGCGkFMVJ2qZsC58E',
   MIXOOR: 'CS31stgBRPvPMBvRAYgsRTbogNkRdUNTsoyQQLcYp7ZD',
   ELUSIV: 'HszJz1zLnYpK5e8TvsRDPSDrxc19qFuhWrFQG6xY2aMX',
+  /** MagicBlock ephemeral SPL global vault WSOL ATA */
+  MAGICBLOCK_SOL:
+    'BhaYZFDmbfNWaebASH9J7xw23GLVnQmLyHJqXivvwM3p',
 } as const;
+
+/** MagicBlock private payments / shield */
+export const MAGICBLOCK_URL = 'https://one.magicblock.app';
+export const MAGICBLOCK_PROGRAM =
+  'SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2';
 
 export const PROTOCOL_DEFINITIONS = [
   {
@@ -51,6 +59,13 @@ export const PROTOCOL_DEFINITIONS = [
     url: 'https://stake.arcium.com',
     linkText: 'stake.arcium.com',
     pools: ['ARX'],
+  },
+  {
+    name: 'MagicBlock',
+    status: 'live' as const,
+    url: 'https://one.magicblock.app',
+    linkText: 'one.magicblock.app',
+    pools: ['SOL'],
   },
   {
     name: 'Light Protocol',
