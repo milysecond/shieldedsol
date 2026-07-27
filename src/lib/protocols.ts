@@ -551,7 +551,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
         },
       ],
       tvl: magicblockUsdc,
-      stats: 'Ephemeral SPL vault · private payments',
+      stats: 'Private USDC vault on MagicBlock One',
     },
     {
       name: 'Light Protocol',
