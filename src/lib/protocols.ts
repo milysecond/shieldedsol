@@ -378,7 +378,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     fetchUmbra(),
     fetchArciumStakedArx(),
     fetchArciumNetworkMeta(),
-    getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_SOL),
+    getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_USDC),
   ]);
 
   let solPrice = 180;
@@ -416,7 +416,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     turbineResult.status === 'fulfilled' ? turbineResult.value : 0;
   const vanishSol =
     vanishResult.status === 'fulfilled' ? vanishResult.value : 0;
-  const magicblockSol =
+  const magicblockUsdc =
     magicblockResult.status === 'fulfilled' ? magicblockResult.value : 0;
   if (magicblockResult.status === 'rejected') {
     console.error('MagicBlock vault fetch error:', magicblockResult.reason);
@@ -544,13 +544,13 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       kind: 'pool',
       pools: [
         {
-          asset: 'SOL',
-          address: POOL_ADDRESSES.MAGICBLOCK_SOL,
-          balance: magicblockSol,
-          usd: magicblockSol * solPrice,
+          asset: 'USDC',
+          address: POOL_ADDRESSES.MAGICBLOCK_USDC,
+          balance: magicblockUsdc,
+          usd: magicblockUsdc,
         },
       ],
-      tvl: magicblockSol * solPrice,
+      tvl: magicblockUsdc,
       stats: 'Ephemeral SPL vault · private payments',
     },
     {
