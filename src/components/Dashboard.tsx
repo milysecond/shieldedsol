@@ -465,6 +465,7 @@ export default function Dashboard() {
   const placeholders = [
     'Privacy Cash',
     'Umbra',
+    'MagicBlock',
     'Vanish Trade',
     'Arcium',
     'Turbine',

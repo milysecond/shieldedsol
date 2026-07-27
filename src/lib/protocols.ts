@@ -64,6 +64,15 @@ async function getBalance(address: string): Promise<number> {
   return (data?.result?.value || 0) / 1e9;
 }
 
+/** SPL token account UI amount (e.g. WSOL vault ATA) */
+async function getTokenAccountBalance(address: string): Promise<number> {
+  const data = await rpcCall('getTokenAccountBalance', [address]);
+  const ui = data?.result?.value?.uiAmount;
+  if (typeof ui === 'number' && !Number.isNaN(ui)) return ui;
+  const s = data?.result?.value?.uiAmountString;
+  return s ? parseFloat(s) || 0 : 0;
+}
+
 async function getTokenSupply(mint: string): Promise<number> {
   const data = await rpcCall('getTokenSupply', [mint]);
   return data?.result?.value?.uiAmount || 0;
@@ -309,6 +318,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     umbraResult,
     arciumStakeResult,
     arciumMetaResult,
+    magicblockResult,
   ] = await Promise.allSettled([
     (async () => {
       const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE, MINTS.ARX].join(',');
@@ -368,6 +378,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     fetchUmbra(),
     fetchArciumStakedArx(),
     fetchArciumNetworkMeta(),
+    getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_SOL),
   ]);
 
   let solPrice = 180;
@@ -405,6 +416,11 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     turbineResult.status === 'fulfilled' ? turbineResult.value : 0;
   const vanishSol =
     vanishResult.status === 'fulfilled' ? vanishResult.value : 0;
+  const magicblockSol =
+    magicblockResult.status === 'fulfilled' ? magicblockResult.value : 0;
+  if (magicblockResult.status === 'rejected') {
+    console.error('MagicBlock vault fetch error:', magicblockResult.reason);
+  }
   const mixoorBalances =
     mixoorResult.status === 'fulfilled'
       ? mixoorResult.value
@@ -519,6 +535,23 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       pools: arciumPools,
       tvl: arciumUsd,
       stats: arciumStats || 'Confidential compute · operator stake',
+    },
+    {
+      name: 'MagicBlock',
+      status: 'live',
+      url: 'https://one.magicblock.app',
+      linkText: 'one.magicblock.app',
+      kind: 'pool',
+      pools: [
+        {
+          asset: 'SOL',
+          address: POOL_ADDRESSES.MAGICBLOCK_SOL,
+          balance: magicblockSol,
+          usd: magicblockSol * solPrice,
+        },
+      ],
+      tvl: magicblockSol * solPrice,
+      stats: 'Ephemeral SPL vault · private payments',
     },
     {
       name: 'Light Protocol',
