@@ -92,6 +92,25 @@ function fmtSolFull(n: number | null | undefined): string {
   });
 }
 
+/** Native token amount for pool chips (not unit-toggle value) */
+function fmtPoolNative(balance: number, asset: string): string {
+  if (balance == null || isNaN(balance)) return '--';
+  const stable = ['USDC', 'USDT', 'USD1', 'CASH', 'USD'];
+  if (stable.includes(asset.toUpperCase())) {
+    return balance.toLocaleString('en-US', {
+      minimumFractionDigits: balance < 100 ? 2 : 0,
+      maximumFractionDigits: 2,
+    });
+  }
+  if (asset.toUpperCase() === 'BONK') {
+    if (balance >= 1e9) return (balance / 1e9).toFixed(2) + 'B';
+    if (balance >= 1e6) return (balance / 1e6).toFixed(2) + 'M';
+    if (balance >= 1e3) return (balance / 1e3).toFixed(1) + 'K';
+    return balance.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
+  return fmtSol(balance);
+}
+
 type DisplayUnit = 'sol' | 'usd';
 
 const DOT_ALPHAS = [0.95, 0.78, 0.62, 0.5, 0.4, 0.32, 0.26, 0.2, 0.16, 0.12];
@@ -824,8 +843,16 @@ export default function Dashboard() {
                       <div className="proto-pools">
                         {pools.map((pool) => (
                           <div key={pool.asset} className="proto-pool-chip">
-                            <span>{pool.asset}</span>
-                            <span className="num">{fmtValue(pool.usd)}</span>
+                            <span className="pool-native">
+                              {fmtPoolNative(pool.balance, pool.asset)}{' '}
+                              {pool.asset}
+                            </span>
+                            <span className="pool-equiv num">
+                              ≈{' '}
+                              {unit === 'sol'
+                                ? `${fmtSol(usdToSol(pool.usd, solPrice))} SOL`
+                                : fmtUsd(pool.usd)}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -840,7 +867,8 @@ export default function Dashboard() {
                           onClick={(e) => e.stopPropagation()}
                         >
                           {protocol.linkText ||
-                            protocol.url.replace(/^https?:\/\//, '')}
+                            protocol.url.replace(/^https?:\/\//, '')}{' '}
+                          ↗
                         </a>
                       )}
                       <button

@@ -392,8 +392,11 @@ body {
   color: var(--accent);
 }
 .proto-details {
-  padding-bottom: 0.25rem;
+  padding: 0.15rem 0 0.85rem;
   animation: fade-in 0.2s ease both;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
 }
 .proto-block.open {
   background: var(--surface);
@@ -447,30 +450,45 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .proto-stats {
-  padding: 0 1rem 0.55rem 1.85rem;
-  font-size: 0.7rem;
+  padding: 0 1rem 0 1.85rem;
+  font-size: 0.68rem;
   color: var(--text3);
-  line-height: 1.35;
+  line-height: 1.45;
 }
 .proto-pools {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  padding: 0 1rem 0.65rem 1.85rem;
+  gap: 0.45rem;
+  padding: 0 1rem 0 1.85rem;
 }
 .proto-pool-chip {
   display: inline-flex;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.3rem 0.55rem;
-  border-radius: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--chip-border);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: var(--text2);
+  line-height: 1.3;
+}
+.pool-native {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pool-equiv {
+  color: var(--text3);
+  font-size: 0.65rem;
 }
 .proto-actions {
-  padding: 0 1rem 0.75rem 1.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  padding: 0 1rem 0 1.85rem;
 }
 .chart-panel {
   width: 100%;
@@ -1035,14 +1053,16 @@ h1 {
 
 /* Links & buttons */
 .protocol-link {
-  color: var(--text4);
-  font-size: 0.625rem;
+  color: var(--text3);
+  font-size: 0.68rem;
   text-decoration: none;
-  margin-top: 0.5rem;
-  display: inline-block;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 .protocol-link:hover {
-  color: var(--text2);
+  color: var(--accent);
 }
 .no-pools {
   color: var(--text5);
@@ -1147,12 +1167,12 @@ h1 {
 .protocol-chart-toggle {
   background: none;
   border: none;
-  color: var(--text4);
-  font-size: 0.625rem;
+  color: var(--text3);
+  font-size: 0.68rem;
   cursor: pointer;
   font-family: inherit;
-  padding: 0.25rem 0;
-  margin-top: 0.25rem;
+  padding: 0;
+  margin-top: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
