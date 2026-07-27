@@ -28,7 +28,8 @@ export const POOL_ADDRESSES = {
   VANISH_TRADE: '8MjKXQgj97NPVNhj9gJrQNP7BibGCGkFMVJ2qZsC58E',
   MIXOOR: 'CS31stgBRPvPMBvRAYgsRTbogNkRdUNTsoyQQLcYp7ZD',
   ELUSIV: 'HszJz1zLnYpK5e8TvsRDPSDrxc19qFuhWrFQG6xY2aMX',
-  /** MagicBlock ephemeral SPL global vault USDC ATA */
+  /** MagicBlock ephemeral SPL global vault ATAs */
+  MAGICBLOCK_SOL: 'BhaYZFDmbfNWaebASH9J7xw23GLVnQmLyHJqXivvwM3p',
   MAGICBLOCK_USDC: 'EgUQeWLDL8QyduApWvAPZcEitcNKQKdnNuvLm16Db8Dy',
 } as const;
 
@@ -64,7 +65,7 @@ export const PROTOCOL_DEFINITIONS = [
     status: 'live' as const,
     url: 'https://one.magicblock.app',
     linkText: 'one.magicblock.app',
-    pools: ['USDC'],
+    pools: ['SOL', 'USDC'],
   },
   {
     name: 'Light Protocol',

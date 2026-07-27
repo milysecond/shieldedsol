@@ -318,7 +318,8 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     umbraResult,
     arciumStakeResult,
     arciumMetaResult,
-    magicblockResult,
+    magicblockSolResult,
+    magicblockUsdcResult,
   ] = await Promise.allSettled([
     (async () => {
       const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE, MINTS.ARX].join(',');
@@ -378,6 +379,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     fetchUmbra(),
     fetchArciumStakedArx(),
     fetchArciumNetworkMeta(),
+    getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_SOL),
     getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_USDC),
   ]);
 
@@ -416,10 +418,19 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     turbineResult.status === 'fulfilled' ? turbineResult.value : 0;
   const vanishSol =
     vanishResult.status === 'fulfilled' ? vanishResult.value : 0;
+  const magicblockSol =
+    magicblockSolResult.status === 'fulfilled'
+      ? magicblockSolResult.value
+      : 0;
   const magicblockUsdc =
-    magicblockResult.status === 'fulfilled' ? magicblockResult.value : 0;
-  if (magicblockResult.status === 'rejected') {
-    console.error('MagicBlock vault fetch error:', magicblockResult.reason);
+    magicblockUsdcResult.status === 'fulfilled'
+      ? magicblockUsdcResult.value
+      : 0;
+  if (magicblockSolResult.status === 'rejected') {
+    console.error('MagicBlock SOL vault error:', magicblockSolResult.reason);
+  }
+  if (magicblockUsdcResult.status === 'rejected') {
+    console.error('MagicBlock USDC vault error:', magicblockUsdcResult.reason);
   }
   const mixoorBalances =
     mixoorResult.status === 'fulfilled'
@@ -544,14 +555,20 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       kind: 'pool',
       pools: [
         {
+          asset: 'SOL',
+          address: POOL_ADDRESSES.MAGICBLOCK_SOL,
+          balance: magicblockSol,
+          usd: magicblockSol * solPrice,
+        },
+        {
           asset: 'USDC',
           address: POOL_ADDRESSES.MAGICBLOCK_USDC,
           balance: magicblockUsdc,
           usd: magicblockUsdc,
         },
       ],
-      tvl: magicblockUsdc,
-      stats: 'Private USDC vault on MagicBlock One',
+      tvl: magicblockSol * solPrice + magicblockUsdc,
+      stats: 'Private SOL + USDC vaults on MagicBlock One',
     },
     {
       name: 'Light Protocol',
