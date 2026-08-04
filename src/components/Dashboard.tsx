@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import DonationWallet from './DonationWallet';
+import LoadOrb from './LoadOrb';
 
 interface Pool {
   asset: string;
@@ -147,15 +148,20 @@ export default function Dashboard() {
     if (saved === 'light') {
       setLightMode(true);
       document.body.classList.add('light');
+      document.body.dataset.theme = 'light';
+    } else {
+      document.body.dataset.theme = 'dark';
     }
-    setAlertsEnabled(localStorage.getItem('alerts') === 'true');
-    lastTvlRef.current = parseFloat(localStorage.getItem('lastTvl') || '0');
-    const savedUnit = localStorage.getItem('displayUnit');
+    setAlertsEnabled(localStorage.getItem('tvl-alerts') === 'true');
+    const savedUnit =
+      localStorage.getItem('display-unit') ||
+      localStorage.getItem('displayUnit');
     if (savedUnit === 'usd' || savedUnit === 'sol') setUnit(savedUnit);
   }, []);
 
   const setDisplayUnit = useCallback((next: DisplayUnit) => {
     setUnit(next);
+    localStorage.setItem('display-unit', next);
     localStorage.setItem('displayUnit', next);
   }, []);
 
@@ -163,6 +169,7 @@ export default function Dashboard() {
     setLightMode((prev) => {
       const next = !prev;
       document.body.classList.toggle('light', next);
+      document.body.dataset.theme = next ? 'light' : 'dark';
       localStorage.setItem('theme', next ? 'light' : 'dark');
       return next;
     });
@@ -603,9 +610,18 @@ export default function Dashboard() {
               )}
             </button>
           </div>
-          <span className="live-pill">
-            <span className="live-dot" />
-            live
+          <span className={`live-pill${loading ? ' is-loading' : ''}`}>
+            {loading ? (
+              <LoadOrb
+                state="breathing"
+                size={20}
+                theme={lightMode ? 'light' : 'dark'}
+                label="Updating"
+              />
+            ) : (
+              <span className="live-dot" />
+            )}
+            {loading ? 'sync' : 'live'}
           </span>
         </div>
       </header>
@@ -637,7 +653,13 @@ export default function Dashboard() {
                 ) : null}
               </>
             ) : loading ? (
-              '···'
+              <LoadOrb
+                state="searching"
+                size={64}
+                theme={lightMode ? 'light' : 'dark'}
+                label="Loading TVL"
+                className="hero-load-orb"
+              />
             ) : (
               '--'
             )}
@@ -934,34 +956,34 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="chart-container">
-            {chartHistory.length > 0
-              ? chartHistory.map((point, i) => {
-                  const h =
-                    chartMax > 0 ? (point.totalTvl / chartMax) * 100 : 0;
-                  return (
-                    <div
-                      key={i}
-                      className="chart-bar revealed"
-                      style={{ height: `${h}%`, animationDelay: `${i * 0.03}s` }}
-                      title={fmtValue(point.totalTvl)}
-                    />
-                  );
-                })
-              : loading
-                ? Array.from({ length: 12 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="chart-bar loading-bar"
-                      style={{
-                        height: `${30 + ((i * 17) % 40)}%`,
-                        animationDelay: `${i * 0.05}s`,
-                      }}
-                    />
-                  ))
-                : (
-                  <div className="empty-note">No history yet</div>
-                )}
-          </div>
+                      {chartHistory.length > 0
+                        ? chartHistory.map((point, i) => {
+                            const h =
+                              chartMax > 0 ? (point.totalTvl / chartMax) * 100 : 0;
+                            return (
+                              <div
+                                key={i}
+                                className="chart-bar revealed"
+                                style={{ height: `${h}%`, animationDelay: `${i * 0.03}s` }}
+                                title={fmtValue(point.totalTvl)}
+                              />
+                            );
+                          })
+                        : loading
+                          ? (
+                              <div className="chart-loading">
+                                <LoadOrb
+                                  state="working"
+                                  size={64}
+                                  theme={lightMode ? 'light' : 'dark'}
+                                  label="Loading TVL history"
+                                />
+                              </div>
+                            )
+                          : (
+                              <div className="empty-note">No history yet</div>
+                            )}
+                    </div>
           <div className="chart-labels">
             <span className="chart-label">{chartStartLabel}</span>
             <span className="chart-label">{chartEndLabel}</span>
@@ -1017,8 +1039,21 @@ export default function Dashboard() {
 
       <footer className="site-footer">
         <div className="footer-left">
-          <button className="refresh" onClick={refresh}>
-            refresh
+          <button
+            className={`refresh${loading ? ' is-loading' : ''}`}
+            onClick={refresh}
+            disabled={loading}
+            type="button"
+          >
+            {loading ? (
+              <LoadOrb
+                state="connecting"
+                size={20}
+                theme={lightMode ? 'light' : 'dark'}
+                label="Refreshing"
+              />
+            ) : null}
+            {loading ? 'refreshing' : 'refresh'}
           </button>
           <span>
             {updatedLabel}
