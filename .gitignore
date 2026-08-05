@@ -1,4 +1,10 @@
 .vercel
 node_modules/
+packages/*/node_modules/
 .env
+.env.local
 .env.production
+.next/
+.open-next/
+.wrangler/
+tsconfig.tsbuildinfo

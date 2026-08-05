@@ -1062,6 +1062,7 @@ export default function Dashboard() {
         </div>
         <div className="footer-right">
           <a href="/history">history</a>
+          <a href="/developers">developers</a>
           <a
             href="https://t.me/metasal"
             target="_blank"
