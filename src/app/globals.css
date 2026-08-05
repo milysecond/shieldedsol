@@ -1708,3 +1708,96 @@ footer a:hover {
     grid-template-columns: 8px 1fr minmax(88px, auto);
   }
 }
+
+/* Developers */
+.dev-page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem 3rem;
+}
+.dev-header {
+  margin-bottom: 2rem;
+}
+.dev-back {
+  color: var(--text3);
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+.dev-back:hover {
+  color: var(--accent);
+}
+.dev-page h1 {
+  font-size: 1.75rem;
+  margin: 0.75rem 0 0.35rem;
+}
+.dev-lead {
+  color: var(--text2);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.dev-section {
+  margin-bottom: 2rem;
+}
+.dev-section h2 {
+  font-size: 1rem;
+  margin-bottom: 0.65rem;
+  color: var(--text);
+}
+.dev-section p {
+  color: var(--text2);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 0.65rem;
+}
+.dev-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.dev-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg2);
+}
+.dev-list code {
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+.dev-list span {
+  font-size: 0.72rem;
+  color: var(--text3);
+}
+.dev-code {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text2);
+  white-space: pre-wrap;
+  margin: 0.5rem 0 1rem;
+}
+.dev-footer {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+.dev-footer a {
+  color: var(--text3);
+  text-decoration: none;
+}
+.dev-footer a:hover {
+  color: var(--accent);
+}

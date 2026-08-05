@@ -1,0 +1,37 @@
+{
+  "name": "@shieldedsol/sdk",
+  "version": "1.0.0",
+  "description": "TypeScript SDK for the Shielded Sol privacy TVL API",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["solana", "privacy", "tvl", "shieldedsol", "sdk"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/milysecond/shieldedsol",
+    "directory": "packages/sdk"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.5.0"
+  }
+}
