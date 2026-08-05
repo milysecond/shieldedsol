@@ -3,6 +3,9 @@ import Script from 'next/script';
 import { SITE_URL, SITE_NAME, GA_ID } from '@/lib/constants';
 import './globals.css';
 
+/** Bump with OG design changes so X/TG/FB refetch the image */
+const OG_IMAGE = `${SITE_URL}/api/og?v=20260805b`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -20,7 +23,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: '/api/og',
+        url: OG_IMAGE,
         width: 1200,
         height: 630,
         alt: 'Shielded Sol — live Solana privacy pool TVL with SOL and USD totals',
@@ -36,7 +39,7 @@ export const metadata: Metadata = {
       'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
     images: [
       {
-        url: '/api/og',
+        url: OG_IMAGE,
         width: 1200,
         height: 630,
         alt: 'Shielded Sol — live Solana privacy pool TVL',

@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { SITE_URL } from '@/lib/constants';
+import { fetchProtocolsData } from '@/lib/protocols';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,33 +55,36 @@ async function loadFont(weight: 400 | 700) {
   return res.arrayBuffer();
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   let totalTvl = 0;
   let solPrice = 0;
   let protocols: Proto[] = [];
   let change = '';
   let changeColor = '#4ade80';
 
-  const host =
-    request.headers.get('x-forwarded-host') || request.headers.get('host');
-  const proto =
-    request.headers.get('x-forwarded-proto') ||
-    (host?.includes('localhost') ? 'http' : 'https');
-  const origin = host ? `${proto}://${host}` : SITE_URL;
-
+  // Direct in-process fetch — works on Vercel + Workers (no self-HTTP / host mismatch)
   try {
-    const apiRes = await fetch(`${origin}/api/protocols`, {
-      next: { revalidate: 60 },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (apiRes.ok) {
-      const data = await apiRes.json();
-      totalTvl = Number(data?.totalTvl) || 0;
-      solPrice = Number(data?.solPrice) || 0;
-      protocols = Array.isArray(data?.protocols) ? data.protocols : [];
-    }
+    const data = await fetchProtocolsData();
+    totalTvl = Number(data?.totalTvl) || 0;
+    solPrice = Number(data?.solPrice) || 0;
+    protocols = Array.isArray(data?.protocols) ? data.protocols : [];
   } catch (err) {
     console.error('OG protocols fetch failed:', err);
+    // Fallback to public www API
+    try {
+      const apiRes = await fetch(`${SITE_URL}/api/protocols`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(12000),
+      });
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        totalTvl = Number(data?.totalTvl) || 0;
+        solPrice = Number(data?.solPrice) || 0;
+        protocols = Array.isArray(data?.protocols) ? data.protocols : [];
+      }
+    } catch (e2) {
+      console.error('OG SITE_URL fallback failed:', e2);
+    }
   }
 
   // Optional 24h delta — ignore absurd spikes
@@ -124,12 +128,18 @@ export async function GET(request: Request) {
   const solTvl = solPrice > 0 ? totalTvl / solPrice : 0;
   const topShare = poolProtos[0] ? (poolProtos[0].tvl / poolSum) * 100 : 0;
 
-  const [fontData, fontBoldData, logoBuf] = await Promise.all([
+  let logoSrc = `${SITE_URL}/logo.png`;
+  try {
+    const logoBuf = await readFile(join(process.cwd(), 'public/logo.png'));
+    logoSrc = `data:image/png;base64,${logoBuf.toString('base64')}`;
+  } catch {
+    /* Workers/path edge — use absolute URL */
+  }
+
+  const [fontData, fontBoldData] = await Promise.all([
     loadFont(400),
     loadFont(700),
-    readFile(join(process.cwd(), 'public/logo.png')),
   ]);
-  const logoSrc = `data:image/png;base64,${logoBuf.toString('base64')}`;
 
   return new ImageResponse(
     (
@@ -542,7 +552,9 @@ export async function GET(request: Request) {
       ],
       headers: {
         'Cache-Control':
-          'public, max-age=60, s-maxage=120, stale-while-revalidate=300',
+          'public, max-age=120, s-maxage=120, stale-while-revalidate=60',
+        'CDN-Cache-Control': 'public, max-age=120',
+        'Vercel-CDN-Cache-Control': 'public, max-age=120',
       },
     }
   );

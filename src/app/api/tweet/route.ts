@@ -56,7 +56,7 @@ async function postTweet(text: string) {
     authToken,
     text,
     proxy: '142.111.48.253:7030@khdrutfi:6k4w4qxpoqep',
-    media: [{ url: `${SITE_URL}/api/og` }],
+    media: [{ url: `${SITE_URL}/api/og?v=20260805b` }],
   };
 
   const response = await fetch(
