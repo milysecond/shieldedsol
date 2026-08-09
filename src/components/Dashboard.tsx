@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import DonationWallet from './DonationWallet';
 import LoadOrb from './LoadOrb';
+import { PROTOCOL_X_HANDLES } from '@/lib/constants';
 
 interface Pool {
   asset: string;
@@ -340,21 +341,36 @@ export default function Dashboard() {
   }, []);
 
   const getShareText = useCallback(() => {
-    const solPrice = data?.solPrice || 0;
-    const fmtVal = (usd: number) =>
-      unit === 'sol'
-        ? `${fmtSol(usdToSol(usd, solPrice))} SOL`
-        : fmtUsd(usd);
-    const tvl = data ? fmtVal(data.totalTvl) : '--';
-    const top = (data?.protocols || [])
-      .filter((p) => p.kind !== 'infra' && p.tvl > 0)
-      .slice(0, 4)
-      .map((p) => `${p.name} ${fmtVal(p.tvl)}`)
-      .join(' · ');
-    return `Solana Privacy Pools TVL: ${tvl}${top ? `\n${top}` : ''}\n\nTrack live → https://shieldedsol.com`;
-  }, [data, unit]);
+      const solPrice = data?.solPrice || 0;
+      const fmtVal = (usd: number) =>
+        unit === 'sol'
+          ? `${fmtSol(usdToSol(usd, solPrice))} SOL`
+          : fmtUsd(usd);
+      const tvl = data ? fmtVal(data.totalTvl) : '--';
+      const live = (data?.protocols || []).filter(
+        (p) => p.kind !== 'infra' && p.status === 'live' && p.tvl > 0
+      );
+      const top = live
+        .slice(0, 4)
+        .map((p) => `${p.name} ${fmtVal(p.tvl)}`)
+        .join(' · ');
+      const tags = Array.from(
+        new Set(
+          live
+            .slice(0, 5)
+            .map((p) => PROTOCOL_X_HANDLES[p.name])
+            .filter(Boolean)
+            .map((h) => `@${h}`)
+        )
+      );
+      // Always credit site; no hashtags
+      if (!tags.includes('@shieldedsol')) tags.push('@shieldedsol');
+      return `Solana privacy pool TVL: ${tvl}${top ? `\n${top}` : ''}${
+        tags.length ? `\n\n${tags.join(' ')}` : ''
+      }\n\nTrack live → https://www.shieldedsol.com`;
+    }, [data, unit]);
 
-  const shareUrl = 'https://shieldedsol.com';
+  const shareUrl = 'https://www.shieldedsol.com';
 
   const openShare = useCallback(
     async (kind: 'x' | 'telegram' | 'copy') => {
@@ -877,6 +893,17 @@ export default function Dashboard() {
                                 ? `${fmtSol(usdToSol(pool.usd, solPrice))} SOL`
                                 : fmtUsd(pool.usd)}
                             </span>
+                            {pool.address ? (
+                              <a
+                                className="pool-link"
+                                href={`https://sol.new/address/${pool.address}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                sol.new ↗
+                              </a>
+                            ) : null}
                           </div>
                         ))}
                       </div>
