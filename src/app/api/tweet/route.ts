@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SITE_URL } from '@/lib/constants';
+import { PROTOCOL_X_HANDLES, SITE_URL } from '@/lib/constants';
 
 async function fetchTVL() {
   let tvlFormatted = '$--';
   let change = '';
+  let tags: string[] = ['@shieldedsol'];
 
   try {
-    const apiRes = await fetch(`${SITE_URL}/api/protocols`);
+    const apiRes = await fetch(`${SITE_URL}/api/protocols`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(12000),
+    });
     const data = await apiRes.json();
     const totalTvl = data?.totalTvl || 0;
 
@@ -17,12 +21,27 @@ async function fetchTVL() {
     } else {
       tvlFormatted = '$' + totalTvl.toFixed(2);
     }
+
+    const live = (data?.protocols || []).filter(
+      (p: { kind?: string; status?: string; tvl?: number; name?: string }) =>
+        p.kind !== 'infra' && p.status === 'live' && (p.tvl || 0) > 0
+    );
+    const handles = live
+      .slice(0, 5)
+      .map((p: { name?: string }) =>
+        p.name ? PROTOCOL_X_HANDLES[p.name] : null
+      )
+      .filter(Boolean)
+      .map((h: string) => `@${h}`);
+    tags = Array.from(new Set([...handles, '@shieldedsol']));
   } catch (e) {
     console.error('Failed to fetch from protocols API:', e);
   }
 
   try {
-    const llamaRes = await fetch('https://api.llama.fi/protocol/privacy-cash');
+    const llamaRes = await fetch('https://api.llama.fi/protocol/privacy-cash', {
+      signal: AbortSignal.timeout(8000),
+    });
     const llamaData = await llamaRes.json();
     const history =
       llamaData?.chainTvls?.Solana?.tvl || llamaData?.tvl || [];
@@ -33,15 +52,17 @@ async function fetchTVL() {
         history[history.length - 2]?.totalLiquidityUSD || 0;
       if (yesterday > 0) {
         const pct = ((current - yesterday) / yesterday) * 100;
-        const arrow = pct >= 0 ? '↑' : '↓';
-        change = `${arrow}${Math.abs(pct).toFixed(1)}%`;
+        if (Math.abs(pct) <= 80) {
+          const arrow = pct >= 0 ? '↑' : '↓';
+          change = `${arrow}${Math.abs(pct).toFixed(1)}%`;
+        }
       }
     }
   } catch (e) {
     console.error('Failed to fetch 24h change:', e);
   }
 
-  return { tvlFormatted, change };
+  return { tvlFormatted, change, tags };
 }
 
 async function postTweet(text: string) {
@@ -91,9 +112,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { tvlFormatted, change } = await fetchTVL();
+    const { tvlFormatted, change, tags } = await fetchTVL();
 
-    const tweetText = `Solana Privacy Pools TVL: ${tvlFormatted}${change ? ` (${change} 24h)` : ''}
+    // 3rd person, no hashtags; tag live projects
+    const tweetText = `Solana privacy pool TVL is ${tvlFormatted}${
+      change ? ` (${change} 24h)` : ''
+    }.
+
+${tags.join(' ')}
 
 Track live at shieldedsol.com`;
 

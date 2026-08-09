@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { DONATION_WALLET } from '@/lib/constants';
+import { DONATION_WALLET, solAddressUrl } from '@/lib/constants';
 
 export default function DonationWallet() {
   const [copied, setCopied] = useState(false);
@@ -36,16 +36,13 @@ export default function DonationWallet() {
         <div className="donation-actions">
           <a
             className="donation-link"
-            href={`https://solscan.io/account/${DONATION_WALLET}`}
+            href={solAddressUrl(DONATION_WALLET)}
             target="_blank"
             rel="noopener noreferrer"
           >
-            Solscan ↗
+            sol.new ↗
           </a>
-          <a
-            className="donation-link"
-            href={`solana:${DONATION_WALLET}`}
-          >
+          <a className="donation-link" href={`solana:${DONATION_WALLET}`}>
             Open wallet
           </a>
         </div>

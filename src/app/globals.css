@@ -1589,78 +1589,292 @@ footer a:hover {
 /* ===== Mobile ===== */
 @media (max-width: 640px) {
   .app-shell {
-    padding: max(0.5rem, env(safe-area-inset-top)) max(0.65rem, env(safe-area-inset-right))
-      max(1rem, env(safe-area-inset-bottom)) max(0.65rem, env(safe-area-inset-left));
+    padding: max(0.4rem, env(safe-area-inset-top)) max(0.55rem, env(safe-area-inset-right))
+      max(1.25rem, env(safe-area-inset-bottom)) max(0.55rem, env(safe-area-inset-left));
   }
 
   .topbar {
-    padding: 0.25rem 0 0.5rem;
+    padding: 0.15rem 0 0.45rem;
+    gap: 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .topbar-brand {
+    font-size: 0.78rem;
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-actions {
+    gap: 0.25rem;
   }
 
   .header-actions .action-btn {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  .live-pill {
+    font-size: 0.68rem;
+    padding: 0.28rem 0.55rem;
   }
 
   .hero {
-    padding-top: 0.75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.25rem;
   }
 
   .hero-logo {
-    width: 104px;
-    height: 104px;
+    width: 88px;
+    height: 88px;
   }
 
   .hero-glow {
-    width: 128px;
-    height: 128px;
+    width: 110px;
+    height: 110px;
   }
 
   .hero-logo-img {
-    width: 96px;
-    height: 96px;
+    width: 80px;
+    height: 80px;
+  }
+
+  .hero-title {
+    font-size: 1.15rem;
+    margin-top: 0.35rem;
   }
 
   .hero-tvl {
-    font-size: clamp(2.4rem, 13vw, 3.4rem);
+    font-size: clamp(2.1rem, 12.5vw, 3.1rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    word-break: break-word;
+  }
+
+  .hero-alt,
+  .comp-meta {
+    font-size: 0.72rem;
+    padding: 0 0.25rem;
+  }
+
+  .unit-toggle {
+    margin: 0.75rem auto 0.85rem;
+    transform: scale(1.05);
+  }
+
+  .unit-btn {
+    min-height: 40px;
+    min-width: 56px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+  }
+
+  .comp-bar-wrap {
+    margin-bottom: 0.85rem;
+  }
+
+  .proto-table {
+    border-radius: 10px;
+    overflow: hidden;
   }
 
   .proto-head,
   .proto-row {
-    grid-template-columns: 8px 1fr minmax(52px, auto) minmax(84px, auto);
-    gap: 0.5rem 0.65rem;
-    padding-left: 0.65rem;
-    padding-right: 0.65rem;
+    grid-template-columns: 8px minmax(0, 1fr) minmax(48px, auto) minmax(78px, auto);
+    gap: 0.4rem 0.5rem;
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+    min-height: 48px;
   }
 
   .proto-name {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .proto-usd {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
+  }
+
+  .proto-status {
+    font-size: 0.62rem;
   }
 
   .proto-stats,
   .proto-pools,
   .proto-actions {
-    padding-left: 1.35rem;
-    padding-right: 0.65rem;
+    padding-left: 1.15rem;
+    padding-right: 0.55rem;
+  }
+
+  .proto-pools {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .proto-pool-chip {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.55rem;
+    padding: 0.55rem 0.65rem;
+  }
+
+  .pool-link {
+    font-size: 0.65rem;
+    color: var(--accent);
+    text-decoration: none;
+    margin-left: auto;
+  }
+
+  .pool-link:hover {
+    text-decoration: underline;
+  }
+
+  .proto-actions {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .protocol-link,
+  .protocol-chart-toggle {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
+  }
+
+  .chart-panel {
+    margin-top: 0.85rem;
+    padding: 0.75rem 0.65rem;
+  }
+
+  .chart-header {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .chart-tabs {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .chart-tab {
+    flex: 1;
+    min-height: 40px;
+    font-size: 0.75rem;
+  }
+
+  .chart-container {
+    height: 72px;
+  }
+
+  .follow-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+
+  .share-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.4rem;
+  }
+
+  .share-chip {
+    width: 100%;
+    min-height: 42px;
+    justify-content: center;
+    font-size: 0.68rem;
+    padding: 0.5rem 0.35rem;
+  }
+
+  .follow-btn {
+    width: 100%;
+    min-height: 42px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .subscribe-panel {
+    padding: 0.75rem 0.65rem;
   }
 
   .subscribe-form {
     flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .subscribe-form input {
+    width: 100%;
+    min-height: 46px;
+    font-size: 16px !important;
   }
 
   .subscribe-form button {
     width: 100%;
+    min-height: 46px;
+  }
+
+  .donation-section {
+    max-width: 100%;
+    margin-top: 0.75rem;
+  }
+
+  .donation-address {
+    min-height: 46px;
+  }
+
+  .donation-full {
+    display: none;
+  }
+
+  .donation-short {
+    display: inline;
+    flex: 1;
+  }
+
+  .donation-actions {
+    gap: 0.75rem;
+  }
+
+  .donation-link {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
   }
 
   .site-footer {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    gap: 0.65rem;
+    padding-top: 0.85rem;
+  }
+
+  .footer-left,
+  .footer-right {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.55rem 0.85rem;
+  }
+
+  .footer-right a,
+  .refresh {
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.72rem;
   }
 
   .history-header.site-header {
@@ -1677,8 +1891,17 @@ footer a:hover {
 
   input,
   select,
-  textarea {
-    font-size: 16px !important;
+  textarea,
+  button {
+    font-size: 16px;
+  }
+
+  .action-btn,
+  .unit-btn,
+  .share-chip,
+  .refresh,
+  .proto-row {
+    touch-action: manipulation;
   }
 
   #slack-btn,
@@ -1695,6 +1918,19 @@ footer a:hover {
   .history-chart-container {
     height: 120px;
   }
+
+  .dev-page {
+    padding-left: max(0.85rem, env(safe-area-inset-left));
+    padding-right: max(0.85rem, env(safe-area-inset-right));
+  }
+
+  .dev-list li {
+    word-break: break-word;
+  }
+
+  .dev-code {
+    font-size: 0.68rem;
+  }
 }
 
 @media (max-width: 380px) {
@@ -1705,8 +1941,33 @@ footer a:hover {
 
   .proto-head,
   .proto-row {
-    grid-template-columns: 8px 1fr minmax(88px, auto);
+    grid-template-columns: 8px minmax(0, 1fr) minmax(84px, auto);
   }
+
+  .share-row {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-tvl {
+    font-size: clamp(1.85rem, 12vw, 2.5rem);
+  }
+}
+
+/* Pool explorer link (desktop + mobile) */
+.pool-link {
+  font-size: 0.62rem;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pool-link:hover {
+  text-decoration: underline;
+}
+.proto-pool-chip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
 }
 
 /* Developers */

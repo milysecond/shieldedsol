@@ -116,3 +116,20 @@ export const SOLANA_RPC = 'https://viviyan-bkj12u-fast-mainnet.helius-rpc.com';
 /** Public donation address for Shielded Sol */
 export const DONATION_WALLET =
   'shLDydVFjPS6zyYo1WJ6JAVeqHf2PAxa2jiLDb8Tudt';
+
+/** X handles for share/tweet tags (no @ prefix) */
+export const PROTOCOL_X_HANDLES: Record<string, string> = {
+  'Privacy Cash': 'theprivacycash',
+  Umbra: 'UmbraPrivacy',
+  Arcium: 'ArciumHQ',
+  MagicBlock: 'magicblock',
+  'Helius Rings': 'heliuslabs',
+  'Light Protocol': 'heliuslabs',
+  'Vanish Trade': 'vanishTrade',
+  Mixoor: 'Mixoordotfun',
+  Turbine: 'turbinecash',
+};
+
+export function solAddressUrl(address: string): string {
+  return `https://sol.new/address/${address}`;
+}
