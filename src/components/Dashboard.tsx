@@ -491,11 +491,13 @@ export default function Dashboard() {
   const placeholders = [
     'Privacy Cash',
     'Umbra',
-    'MagicBlock',
-    'Vanish Trade',
     'Arcium',
+    'MagicBlock',
+    'Helius Rings',
+    'Vanish Trade',
     'Turbine',
     'Mixoor',
+    'Light Protocol',
     'Elusiv',
   ];
 

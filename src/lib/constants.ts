@@ -38,6 +38,9 @@ export const MAGICBLOCK_URL = 'https://one.magicblock.app';
 export const MAGICBLOCK_PROGRAM =
   'SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2';
 
+/** Helius Rings product page (private beta; mainnet pending audits) */
+export const HELIUS_RINGS_URL = 'https://www.helius.dev/privacy';
+
 export const PROTOCOL_DEFINITIONS = [
   {
     name: 'Privacy Cash',
@@ -66,6 +69,13 @@ export const PROTOCOL_DEFINITIONS = [
     url: 'https://one.magicblock.app',
     linkText: 'one.magicblock.app',
     pools: ['SOL', 'USDC'],
+  },
+  {
+    name: 'Helius Rings',
+    status: 'upcoming' as const,
+    url: HELIUS_RINGS_URL,
+    linkText: 'helius.dev/privacy',
+    pools: [] as string[],
   },
   {
     name: 'Light Protocol',

@@ -571,14 +571,25 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       stats: 'Private SOL + USDC vaults on MagicBlock One',
     },
     {
+      name: 'Helius Rings',
+      status: 'upcoming',
+      url: 'https://www.helius.dev/privacy',
+      linkText: 'helius.dev/privacy',
+      kind: 'pool',
+      pools: [],
+      tvl: 0,
+      stats:
+        'Private beta · confidential + anonymous rings · mainnet after audits',
+    },
+    {
       name: 'Light Protocol',
       status: 'live',
       url: 'https://lightprotocol.com',
       linkText: 'lightprotocol.com',
-      kind: 'pool',
-      pools: [{ asset: 'SOL', address: null, balance: 0, usd: 0 }],
+      kind: 'infra',
+      pools: [],
       tvl: 0,
-      stats: 'ZK compression · TVL feed pending',
+      stats: 'Acquired by Helius (2026) · ZK compression · feeds Rings',
     },
     {
       name: 'Turbine',
@@ -683,17 +694,25 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     },
   ];
 
-  // Sort live pool protocols by TVL, keep sunset last, infra after pools with TVL
+  // live pools by TVL → upcoming → infra → sunset
+  const rank = (p: Protocol) => {
+    if (p.status === 'sunset') return 3;
+    if (p.kind === 'infra') return 2;
+    if (p.status === 'upcoming') return 1;
+    return 0;
+  };
   protocols.sort((a, b) => {
-    if (a.status === 'sunset' && b.status !== 'sunset') return 1;
-    if (b.status === 'sunset' && a.status !== 'sunset') return -1;
-    if (a.kind === 'infra' && b.kind !== 'infra') return 1;
-    if (b.kind === 'infra' && a.kind !== 'infra') return -1;
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
     return b.tvl - a.tvl;
   });
 
-  // Total excludes pure infra (already tvl 0)
-  const totalTvl = protocols.reduce((sum, p) => sum + (p.tvl || 0), 0);
+  // Total = live pool TVL only (exclude sunset residual + infra/upcoming zeros)
+  const totalTvl = protocols.reduce((sum, p) => {
+    if (p.status !== 'live' || p.kind === 'infra') return sum;
+    return sum + (p.tvl || 0);
+  }, 0);
 
   return {
     solPrice,
