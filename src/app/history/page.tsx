@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import MadeByMilysec from '@/components/MadeByMilysec';
 
 interface HistoryPoint {
   timestamp: string;
@@ -239,6 +240,8 @@ export default function HistoryPage() {
       <div className="history-footer">
         Last updated: {new Date().toLocaleTimeString()} &middot;{' '}
         <a href="https://x.com/shieldedsol" target="_blank" rel="noopener noreferrer">@shieldedsol</a>
+        {' · '}
+        <MadeByMilysec height={22} className="history-milysec" />
       </div>
     </div>
   );
