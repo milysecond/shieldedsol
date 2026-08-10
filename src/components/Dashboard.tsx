@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import DonationWallet from './DonationWallet';
 import LoadOrb from './LoadOrb';
+import MadeByMilysec from './MadeByMilysec';
 import { PROTOCOL_X_HANDLES } from '@/lib/constants';
 
 interface Pool {
@@ -1099,13 +1100,7 @@ export default function Dashboard() {
           >
             + add protocol
           </a>
-          <a
-            href="https://metasal.xyz"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            metasal.xyz
-          </a>
+          <MadeByMilysec height={26} />
         </div>
       </footer>
     </div>

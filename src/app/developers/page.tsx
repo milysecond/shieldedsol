@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
+import MadeByMilysec from '@/components/MadeByMilysec';
 
 export const metadata: Metadata = {
   title: 'Developers — API, MCP & SDK',
@@ -95,6 +96,7 @@ const hist = await client.tvlHistory('30d');`}</pre>
         <a href="/api/v1/openapi.json">OpenAPI</a>
         <a href="https://github.com/milysecond/shieldedsol">GitHub</a>
         <a href="/">Dashboard</a>
+        <MadeByMilysec height={26} />
       </footer>
     </main>
   );

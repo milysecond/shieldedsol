@@ -1564,6 +1564,22 @@ footer a:hover {
 .donation-link:hover {
   color: var(--accent);
 }
+
+.made-by-milysec {
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.72;
+  transition: opacity 0.15s ease;
+  line-height: 0;
+}
+.made-by-milysec:hover {
+  opacity: 1;
+}
+.history-footer .made-by-milysec {
+  vertical-align: middle;
+  margin-left: 0.15rem;
+}
+
 @media (max-width: 640px) {
   .donation-section {
     max-width: 100%;
@@ -1574,6 +1590,9 @@ footer a:hover {
   .donation-short {
     display: inline;
     flex: 1;
+  }
+  .footer-right .made-by-milysec {
+    margin-top: 0.15rem;
   }
 }
 
