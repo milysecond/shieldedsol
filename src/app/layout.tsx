@@ -13,11 +13,11 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description:
-    'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
+    'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Arcium, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
   openGraph: {
     title: `${SITE_NAME} - Real-Time Solana Privacy Pool Tracker`,
     description:
-      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
+      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Arcium, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
     url: SITE_URL,
     siteName: SITE_NAME,
     type: 'website',
@@ -34,9 +34,10 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     site: '@shieldedsol',
+    creator: '@shieldedsol',
     title: `${SITE_NAME} - Real-Time Solana Privacy Pool Tracker`,
     description:
-      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, and other privacy pools with live balances, historical charts, and TVL alerts.',
+      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Arcium, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
     images: [
       {
         url: OG_IMAGE,
@@ -45,6 +46,20 @@ export const metadata: Metadata = {
         alt: 'Shielded Sol — live Solana privacy pool TVL',
       },
     ],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
+  alternates: {
+    canonical: SITE_URL,
   },
   icons: {
     icon: [

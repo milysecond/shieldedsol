@@ -657,8 +657,8 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     {
       name: 'Elusiv',
       status: 'sunset',
-      url: 'https://elusiv.io',
-      linkText: 'elusiv.io',
+      url: 'https://x.com/elusivprivacy',
+      linkText: 'sunset · @elusivprivacy',
       kind: 'pool',
       pools: [
         {
