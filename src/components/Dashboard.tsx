@@ -341,67 +341,91 @@ export default function Dashboard() {
     setExpanded((prev) => ({ ...prev, [protocolName]: !prev[protocolName] }));
   }, []);
 
-  const getShareText = useCallback(() => {
-      const solPrice = data?.solPrice || 0;
-      const fmtVal = (usd: number) =>
-        unit === 'sol'
-          ? `${fmtSol(usdToSol(usd, solPrice))} SOL`
-          : fmtUsd(usd);
-      const tvl = data ? fmtVal(data.totalTvl) : '--';
-      const live = (data?.protocols || []).filter(
-        (p) => p.kind !== 'infra' && p.status === 'live' && p.tvl > 0
-      );
-      const top = live
-        .slice(0, 4)
-        .map((p) => `${p.name} ${fmtVal(p.tvl)}`)
-        .join(' · ');
-      const tags = Array.from(
-        new Set(
-          live
-            .slice(0, 5)
-            .map((p) => PROTOCOL_X_HANDLES[p.name])
-            .filter(Boolean)
-            .map((h) => `@${h}`)
-        )
-      );
-      // Always credit site; no hashtags
-      if (!tags.includes('@shieldedsol')) tags.push('@shieldedsol');
-      return `Solana privacy pool TVL: ${tvl}${top ? `\n${top}` : ''}${
-        tags.length ? `\n\n${tags.join(' ')}` : ''
-      }\n\nTrack live → https://www.shieldedsol.com`;
-    }, [data, unit]);
+  const getShareText = useCallback(
+      (kind: 'x' | 'telegram' | 'copy' = 'copy') => {
+      // Share always uses USD for clarity on social
+      const tvl = data ? fmtUsd(data.totalTvl) : '--';
+        const live = (data?.protocols || [])
+          .filter(
+            (p) => p.kind !== 'infra' && p.status === 'live' && p.tvl > 0
+          )
+          .sort((a, b) => b.tvl - a.tvl);
+        const top = live
+          .slice(0, 3)
+          .map((p) => `${p.name} ${fmtUsd(p.tvl)}`)
+          .join(' · ');
 
-  const shareUrl = 'https://www.shieldedsol.com';
+        // X: short + few tags. Copy/TG can be slightly fuller.
+        const leadHandle = live[0]
+          ? PROTOCOL_X_HANDLES[live[0].name]
+          : null;
+        const tags =
+          kind === 'x'
+            ? ['@shieldedsol', leadHandle ? `@${leadHandle}` : null]
+                .filter(Boolean)
+                .join(' ')
+            : Array.from(
+                new Set(
+                  [
+                    ...live
+                      .slice(0, 3)
+                      .map((p) => PROTOCOL_X_HANDLES[p.name])
+                      .filter(Boolean)
+                      .map((h) => `@${h}`),
+                    '@shieldedsol',
+                  ].filter(Boolean) as string[]
+                )
+              ).join(' ');
 
-  const openShare = useCallback(
-    async (kind: 'x' | 'telegram' | 'copy') => {
-      const text = getShareText();
-      if (kind === 'x') {
-        window.open(
-          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
-          '_blank',
-          'width=550,height=420'
-        );
-        return;
-      }
-      if (kind === 'telegram') {
-        window.open(
-          `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`,
-          '_blank',
-          'width=550,height=420'
-        );
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(`${text}\n${shareUrl}`);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1800);
-      } catch {
-        setCopied(false);
-      }
-    },
-    [getShareText]
-  );
+        if (kind === 'x') {
+          // No trailing URL — intent uses &url=
+          return `Solana privacy pool TVL: ${tvl}${
+            top ? `\n${top}` : ''
+          }${tags ? `\n\n${tags}` : ''}`;
+        }
+
+        return `Solana privacy pool TVL: ${tvl}${top ? `\n${top}` : ''}${
+          tags ? `\n\n${tags}` : ''
+        }\n\nhttps://www.shieldedsol.com`;
+      },
+      [data]
+    );
+
+    const shareUrl = 'https://www.shieldedsol.com';
+
+    const openShare = useCallback(
+      async (kind: 'x' | 'telegram' | 'copy') => {
+        const text = getShareText(kind);
+        if (kind === 'x') {
+          window.open(
+            `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+              text
+            )}&url=${encodeURIComponent(shareUrl)}`,
+            '_blank',
+            'width=550,height=420'
+          );
+          return;
+        }
+        if (kind === 'telegram') {
+          window.open(
+            `https://t.me/share/url?url=${encodeURIComponent(
+              shareUrl
+            )}&text=${encodeURIComponent(text)}`,
+            '_blank',
+            'width=550,height=420'
+          );
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1800);
+        } catch {
+          setCopied(false);
+        }
+      },
+      [getShareText]
+    );
 
   const handleSubscribe = useCallback(
     async (e: React.FormEvent) => {
