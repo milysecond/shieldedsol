@@ -320,6 +320,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     arciumMetaResult,
     magicblockSolResult,
     magicblockUsdcResult,
+    voidifyResult,
   ] = await Promise.allSettled([
     (async () => {
       const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE, MINTS.ARX].join(',');
@@ -381,6 +382,14 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     fetchArciumNetworkMeta(),
     getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_SOL),
     getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_USDC),
+    (async () => {
+      const [classicSol, novaSol, novaUsdc] = await Promise.all([
+        getBalance(POOL_ADDRESSES.VOIDIFY_CLASSIC_SOL),
+        getBalance(POOL_ADDRESSES.VOIDIFY_NOVA_SOL),
+        getTokenAccountBalance(POOL_ADDRESSES.VOIDIFY_NOVA_USDC),
+      ]);
+      return { classicSol, novaSol, novaUsdc };
+    })(),
   ]);
 
   let solPrice = 180;
@@ -432,6 +441,16 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
   if (magicblockUsdcResult.status === 'rejected') {
     console.error('MagicBlock USDC vault error:', magicblockUsdcResult.reason);
   }
+  const voidifyBalances =
+    voidifyResult.status === 'fulfilled'
+      ? voidifyResult.value
+      : { classicSol: 0, novaSol: 0, novaUsdc: 0 };
+  if (voidifyResult.status === 'rejected') {
+    console.error('Voidify vault error:', voidifyResult.reason);
+  }
+  const voidifySol = voidifyBalances.classicSol + voidifyBalances.novaSol;
+  const voidifyUsdc = voidifyBalances.novaUsdc;
+  const voidifyTvl = voidifySol * solPrice + voidifyUsdc;
   const mixoorBalances =
     mixoorResult.status === 'fulfilled'
       ? mixoorResult.value
@@ -622,6 +641,35 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
         },
       ],
       tvl: vanishSol * solPrice,
+    },
+    {
+      name: 'Voidify',
+      status: 'live',
+      url: 'https://x.com/VoidifyPrivacy',
+      linkText: '@VoidifyPrivacy',
+      kind: 'pool',
+      pools: [
+        {
+          asset: 'SOL',
+          address: POOL_ADDRESSES.VOIDIFY_CLASSIC_SOL,
+          balance: voidifyBalances.classicSol,
+          usd: voidifyBalances.classicSol * solPrice,
+        },
+        {
+          asset: 'SOL',
+          address: POOL_ADDRESSES.VOIDIFY_NOVA_SOL,
+          balance: voidifyBalances.novaSol,
+          usd: voidifyBalances.novaSol * solPrice,
+        },
+        {
+          asset: 'USDC',
+          address: POOL_ADDRESSES.VOIDIFY_NOVA_USDC,
+          balance: voidifyUsdc,
+          usd: voidifyUsdc,
+        },
+      ],
+      tvl: voidifyTvl,
+      stats: 'ZK mixer · classic + nova treasuries',
     },
     {
       name: 'Mixoor',

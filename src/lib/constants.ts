@@ -31,7 +31,17 @@ export const POOL_ADDRESSES = {
   /** MagicBlock ephemeral SPL global vault ATAs */
   MAGICBLOCK_SOL: 'BhaYZFDmbfNWaebASH9J7xw23GLVnQmLyHJqXivvwM3p',
   MAGICBLOCK_USDC: 'EgUQeWLDL8QyduApWvAPZcEitcNKQKdnNuvLm16Db8Dy',
+  /** Voidify treasuries (DefiLlama adapter) */
+  VOIDIFY_CLASSIC_SOL: 'CkNY5wS3zfU4rSGoGhmu555NxA7ch8bZ3srZZroNjHzm',
+  VOIDIFY_NOVA_SOL: 'EMCwkeGAxsMAPWU2gXW3H8mde2kzCm228kthwEznrPsZ',
+  VOIDIFY_NOVA_USDC: 'CBWMnizg2pQCqDXa1ZSdp8TH2FsfUMv9cp9RAPzatbzK',
 } as const;
+
+/** Voidify on-chain programs */
+export const VOIDIFY_CORE_PROGRAM =
+  '4WJnXP7mFxFY45SYvfyGDwEBdcwafVqdgbYYSHpoded4';
+export const VOIDIFY_USER_VOID_PROGRAM =
+  'voiDecqpJdvgeCG9CerdEZY7WwY1mrQM1n3jDnWMzPi';
 
 /** MagicBlock private payments / shield */
 export const MAGICBLOCK_URL = 'https://one.magicblock.app';
@@ -97,6 +107,13 @@ export const PROTOCOL_DEFINITIONS = [
     pools: ['SOL'],
   },
   {
+    name: 'Voidify',
+    status: 'live' as const,
+    url: 'https://x.com/VoidifyPrivacy',
+    linkText: '@VoidifyPrivacy',
+    pools: ['SOL', 'USDC'],
+  },
+  {
     name: 'Mixoor',
     status: 'live' as const,
     url: 'https://mixoor.fun',
@@ -129,6 +146,7 @@ export const PROTOCOL_X_HANDLES: Record<string, string> = {
   'Vanish Trade': 'vanishTrade',
   Mixoor: 'Mixoordotfun',
   Turbine: 'turbinecash',
+  Voidify: 'VoidifyPrivacy',
   Elusiv: 'elusivprivacy',
 };
 

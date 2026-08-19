@@ -95,6 +95,7 @@ const hist = await client.tvlHistory('30d');`}</pre>
       <footer className="dev-footer">
         <a href="/api/v1/openapi.json">OpenAPI</a>
         <a href="https://github.com/milysecond/shieldedsol">GitHub</a>
+        <a href="/lookout">Lookout</a>
         <a href="/">Dashboard</a>
         <MadeByMilysec height={26} />
       </footer>
