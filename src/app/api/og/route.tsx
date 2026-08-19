@@ -87,27 +87,30 @@ export async function GET() {
     }
   }
 
-  // Optional 24h delta — ignore absurd spikes
+  // Optional 24h delta from our own total — not Privacy Cash–only Llama
   try {
-    const llamaRes = await fetch('https://api.llama.fi/protocol/privacy-cash', {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (llamaRes.ok) {
-      const llamaData = await llamaRes.json();
-      const chainTvls = llamaData?.chainTvls || {};
-      const allHistory = Object.values(chainTvls).flatMap(
-        (c: unknown) =>
-          (c as { tvl?: { date: number; totalLiquidityUSD: number }[] })?.tvl ||
-          []
-      );
-      if (allHistory.length >= 2) {
-        allHistory.sort((a, b) => a.date - b.date);
-        const current =
-          allHistory[allHistory.length - 1]?.totalLiquidityUSD || 0;
-        const yesterday =
-          allHistory[allHistory.length - 2]?.totalLiquidityUSD || 0;
-        if (yesterday > 0) {
-          const pct = ((current - yesterday) / yesterday) * 100;
+    const histRes = await fetch(
+      `${SITE_URL}/api/v1/history/tvl?range=24h`,
+      { cache: 'no-store', signal: AbortSignal.timeout(6000) }
+    );
+    if (histRes.ok) {
+      const hist = await histRes.json();
+      const pts = Array.isArray(hist?.history)
+        ? hist.history
+        : Array.isArray(hist?.data)
+          ? hist.data
+          : [];
+      if (pts.length >= 2) {
+        const first =
+          Number(pts[0]?.totalTvlUsd ?? pts[0]?.totalTvl ?? pts[0]?.tvl) || 0;
+        const last =
+          Number(
+            pts[pts.length - 1]?.totalTvlUsd ??
+              pts[pts.length - 1]?.totalTvl ??
+              pts[pts.length - 1]?.tvl
+          ) || 0;
+        if (first > 0 && last > 0) {
+          const pct = ((last - first) / first) * 100;
           if (Math.abs(pct) <= 80) {
             const isPositive = pct >= 0;
             change = `${isPositive ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% 24h`;
@@ -120,13 +123,25 @@ export async function GET() {
     /* optional */
   }
 
-  const poolProtos = protocols
-    .filter((p) => p.kind !== 'infra' && p.status !== 'sunset' && p.tvl > 0)
-    .sort((a, b) => b.tvl - a.tvl)
-    .slice(0, 3);
-  const poolSum = poolProtos.reduce((s, p) => s + p.tvl, 0) || 1;
-  const solTvl = solPrice > 0 ? totalTvl / solPrice : 0;
-  const topShare = poolProtos[0] ? (poolProtos[0].tvl / poolSum) * 100 : 0;
+  // Live privacy pools only (no infra / sunset / upcoming zeros)
+  const livePools = protocols
+    .filter(
+      (p) =>
+        p.kind !== 'infra' &&
+        p.status === 'live' &&
+        typeof p.tvl === 'number' &&
+        p.tvl > 0
+    )
+    .sort((a, b) => b.tvl - a.tvl);
+  // Prefer API totalTvl when present; else sum live pools
+  const liveTotal =
+    totalTvl > 0
+      ? totalTvl
+      : livePools.reduce((s, p) => s + p.tvl, 0);
+  const poolProtos = livePools.slice(0, 3);
+  const denom = liveTotal > 0 ? liveTotal : 1;
+  const solTvl = solPrice > 0 ? liveTotal / solPrice : 0;
+  const topShare = poolProtos[0] ? (poolProtos[0].tvl / denom) * 100 : 0;
 
   let logoSrc = `${SITE_URL}/logo.png`;
   try {
@@ -349,7 +364,7 @@ export async function GET() {
                   fontWeight: 700,
                 }}
               >
-                {fmtUsdFull(totalTvl)}
+                {fmtUsdFull(liveTotal)}
               </div>
             </div>
             <div
@@ -395,7 +410,7 @@ export async function GET() {
             }}
           >
             {poolProtos.map((p, i) => {
-              const w = Math.max(3, (p.tvl / poolSum) * 100);
+              const w = Math.max(3, (p.tvl / denom) * 100);
               const alpha = [0.95, 0.7, 0.48][i] || 0.3;
               return (
                 <div
@@ -422,7 +437,7 @@ export async function GET() {
             }}
           >
             {poolProtos.map((p, i) => {
-              const share = (p.tvl / poolSum) * 100;
+              const share = (p.tvl / denom) * 100;
               const alpha = [0.95, 0.7, 0.48][i] || 0.3;
               return (
                 <div
