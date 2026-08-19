@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import DonationWallet from './DonationWallet';
 import LoadOrb from './LoadOrb';
 import MadeByMilysec from './MadeByMilysec';
-import { PROTOCOL_X_HANDLES } from '@/lib/constants';
+import { PROTOCOL_X_HANDLES, SITE_URL } from '@/lib/constants';
+import {
+  matchProtocolName,
+  protocolDeepLink,
+  slugifyProtocol,
+} from '@/lib/slug';
 
 interface Pool {
   asset: string;
@@ -28,9 +33,25 @@ interface ProtocolsResponse {
   orePrice: number;
   totalTvl: number;
   protocols: Protocol[];
-  updatedAt: string;
   cached?: boolean;
+  timestamp?: string;
+  updatedAt?: string;
 }
+
+type DisplayUnit = 'sol' | 'usd';
+
+type DashboardProps = {
+  /** From /p/[slug] route */
+  initialProtocolSlug?: string;
+};
+
+function fmtShareUsd(n: number): string {
+  if (!n || n <= 0) return '$--';
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
+  return `$${Math.round(n)}`;
+}
+
 interface HistoryPoint {
   timestamp: string;
   totalTvl: number;
@@ -114,8 +135,6 @@ function fmtPoolNative(balance: number, asset: string): string {
   return fmtSol(balance);
 }
 
-type DisplayUnit = 'sol' | 'usd';
-
 const DOT_ALPHAS = [0.95, 0.78, 0.62, 0.5, 0.4, 0.32, 0.26, 0.2, 0.16, 0.12];
 function segmentColor(i: number, _accent = false): string {
   const a = DOT_ALPHAS[Math.min(i, DOT_ALPHAS.length - 1)];
@@ -123,7 +142,9 @@ function segmentColor(i: number, _accent = false): string {
   return `rgba(124, 44, 255, ${a})`;
 }
 
-export default function Dashboard() {
+export default function Dashboard({
+  initialProtocolSlug = '',
+}: DashboardProps) {
   const [data, setData] = useState<ProtocolsResponse | null>(null);
   const [chartHistory, setChartHistory] = useState<HistoryPoint[]>([]);
   const [chartPeriod, setChartPeriod] = useState(7);
@@ -133,6 +154,9 @@ export default function Dashboard() {
     Record<string, ProtocolHistoryPoint[]>
   >({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [focusName, setFocusName] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState<string | null>(null);
+  const deeplinkApplied = useRef(false);
   const [unit, setUnit] = useState<DisplayUnit>('sol');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -338,30 +362,95 @@ export default function Dashboard() {
   );
 
   const toggleExpanded = useCallback((protocolName: string) => {
-    setExpanded((prev) => ({ ...prev, [protocolName]: !prev[protocolName] }));
-  }, []);
+      setExpanded((prev) => {
+        const nextOpen = !prev[protocolName];
+        const next = { ...prev, [protocolName]: nextOpen };
+        return next;
+      });
+    }, []);
 
-  const getShareText = useCallback(
+    const setUrlForProtocol = useCallback((name: string | null) => {
+      if (typeof window === 'undefined') return;
+      try {
+        const url = new URL(window.location.href);
+        if (name) {
+          const slug = slugifyProtocol(name);
+          // Prefer clean /p/slug when already on deep path or home
+          if (
+            url.pathname === '/' ||
+            url.pathname === '' ||
+            url.pathname.startsWith('/p/')
+          ) {
+            url.pathname = `/p/${slug}`;
+            url.searchParams.delete('p');
+            url.searchParams.delete('protocol');
+          } else {
+            url.searchParams.set('p', slug);
+          }
+        } else if (url.pathname.startsWith('/p/')) {
+          url.pathname = '/';
+          url.searchParams.delete('p');
+          url.searchParams.delete('protocol');
+        } else {
+          url.searchParams.delete('p');
+          url.searchParams.delete('protocol');
+        }
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+      } catch {
+        /* ignore */
+      }
+    }, []);
+
+    const focusProtocol = useCallback(
+      (name: string, opts?: { scroll?: boolean; updateUrl?: boolean }) => {
+        setExpanded((prev) => ({ ...prev, [name]: true }));
+        setFocusName(name);
+        if (opts?.updateUrl !== false) setUrlForProtocol(name);
+        if (opts?.scroll !== false) {
+          requestAnimationFrame(() => {
+            const el = document.querySelector(
+              `[data-protocol-slug="${slugifyProtocol(name)}"]`
+            );
+            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        }
+      },
+      [setUrlForProtocol]
+    );
+
+    // Deep link: /p/slug, ?p=, ?protocol=
+    useEffect(() => {
+      if (!data?.protocols?.length || deeplinkApplied.current) return;
+      let key = initialProtocolSlug || '';
+      if (!key && typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        key =
+          params.get('p') ||
+          params.get('protocol') ||
+          window.location.pathname.match(/^\/p\/([^/?#]+)/)?.[1] ||
+          '';
+      }
+      if (!key) {
+        deeplinkApplied.current = true;
+        return;
+      }
+      const name = matchProtocolName(data.protocols, key);
+      deeplinkApplied.current = true;
+      if (name) focusProtocol(name, { updateUrl: true, scroll: true });
+    }, [data, initialProtocolSlug, focusProtocol]);
+
+    const getShareText = useCallback(
       (kind: 'x' | 'telegram' | 'copy' = 'copy') => {
-        // Compact USD — short tokens so X doesn't wrap mid-name
-        const fmtShare = (n: number) => {
-          if (!n || n <= 0) return '$--';
-          if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-          if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
-          return `$${Math.round(n)}`;
-        };
-
-        const tvl = data ? fmtShare(data.totalTvl) : '--';
+        const tvl = data ? fmtShareUsd(data.totalTvl) : '--';
         const live = (data?.protocols || [])
           .filter(
             (p) => p.kind !== 'infra' && p.status === 'live' && p.tvl > 0
           )
           .sort((a, b) => b.tvl - a.tvl);
 
-        // One protocol per line — prevents "Arciu / m $85K" mid-wrap
         const topBlock = live
           .slice(0, 3)
-          .map((p) => `${p.name}  ${fmtShare(p.tvl)}`)
+          .map((p) => `${p.name}  ${fmtShareUsd(p.tvl)}`)
           .join('\n');
 
         const leadHandle = live[0]
@@ -392,16 +481,35 @@ export default function Dashboard() {
         ].filter(Boolean);
 
         if (kind === 'x') {
-          // URL via intent &url= (card). Keep body clean.
           return lines.join('\n\n');
         }
 
-        return [...lines, 'https://www.shieldedsol.com'].join('\n\n');
+        return [...lines, SITE_URL].join('\n\n');
       },
       [data]
     );
 
-    const shareUrl = 'https://www.shieldedsol.com';
+    const getProtocolShareText = useCallback(
+      (protocol: Protocol, kind: 'x' | 'telegram' | 'copy' = 'copy') => {
+        const tvl =
+          protocol.kind === 'infra' ? '—' : fmtShareUsd(protocol.tvl || 0);
+        const handle = PROTOCOL_X_HANDLES[protocol.name];
+        const tags = ['@shieldedsol', handle ? `@${handle}` : null]
+          .filter(Boolean)
+          .join(' ');
+        const link = protocolDeepLink(protocol.name, SITE_URL);
+        const lines = [
+          `${protocol.name} on Shielded Sol: ${tvl}`,
+          protocol.stats || null,
+          tags || null,
+        ].filter(Boolean);
+        if (kind === 'x') return lines.join('\n\n');
+        return [...lines, link].join('\n\n');
+      },
+      []
+    );
+
+    const shareUrl = SITE_URL;
 
     const openShare = useCallback(
       async (kind: 'x' | 'telegram' | 'copy') => {
@@ -435,6 +543,51 @@ export default function Dashboard() {
         }
       },
       [getShareText]
+    );
+
+    const openProtocolShare = useCallback(
+      async (protocol: Protocol, kind: 'x' | 'telegram' | 'copy' | 'link') => {
+        const link = protocolDeepLink(protocol.name, SITE_URL);
+        if (kind === 'link') {
+          try {
+            await navigator.clipboard.writeText(link);
+            setLinkCopied(protocol.name);
+            window.setTimeout(() => setLinkCopied(null), 1800);
+          } catch {
+            setLinkCopied(null);
+          }
+          return;
+        }
+        const text = getProtocolShareText(protocol, kind);
+        if (kind === 'x') {
+          window.open(
+            `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+              text
+            )}&url=${encodeURIComponent(link)}`,
+            '_blank',
+            'width=550,height=420'
+          );
+          return;
+        }
+        if (kind === 'telegram') {
+          window.open(
+            `https://t.me/share/url?url=${encodeURIComponent(
+              link
+            )}&text=${encodeURIComponent(text)}`,
+            '_blank',
+            'width=550,height=420'
+          );
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          setLinkCopied(protocol.name);
+          window.setTimeout(() => setLinkCopied(null), 1800);
+        } catch {
+          setLinkCopied(null);
+        }
+      },
+      [getProtocolShareText]
     );
 
   const handleSubscribe = useCallback(
@@ -863,13 +1016,26 @@ export default function Dashboard() {
             return (
               <div
                 key={name}
-                className={`proto-block${isOpen ? ' open' : ''}`}
+                id={`protocol-${slugifyProtocol(name)}`}
+                data-protocol-slug={slugifyProtocol(name)}
+                className={`proto-block${isOpen ? ' open' : ''}${
+                  focusName === name ? ' focused' : ''
+                }`}
               >
                 <button
                   type="button"
                   className={`proto-row${isPlaceholder ? ' muted' : ''}`}
                   onClick={() => {
-                    if (!isPlaceholder) toggleExpanded(name);
+                    if (isPlaceholder) return;
+                    const willOpen = !expanded[name];
+                    toggleExpanded(name);
+                    if (willOpen) {
+                      setFocusName(name);
+                      setUrlForProtocol(name);
+                    } else if (focusName === name) {
+                      setFocusName(null);
+                      setUrlForProtocol(null);
+                    }
                   }}
                   aria-expanded={isOpen}
                   disabled={isPlaceholder}
@@ -961,6 +1127,44 @@ export default function Dashboard() {
                           ↗
                         </a>
                       )}
+                      <div className="proto-share" role="group" aria-label={`Share ${name}`}>
+                        <button
+                          type="button"
+                          className="proto-share-btn"
+                          title="Copy deeplink"
+                          aria-label={`Copy deeplink for ${name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openProtocolShare(protocol, 'link');
+                          }}
+                        >
+                          {linkCopied === name ? 'Copied' : 'Link'}
+                        </button>
+                        <button
+                          type="button"
+                          className="proto-share-btn"
+                          title="Share on X"
+                          aria-label={`Share ${name} on X`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openProtocolShare(protocol, 'x');
+                          }}
+                        >
+                          X
+                        </button>
+                        <button
+                          type="button"
+                          className="proto-share-btn"
+                          title="Share on Telegram"
+                          aria-label={`Share ${name} on Telegram`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openProtocolShare(protocol, 'telegram');
+                          }}
+                        >
+                          TG
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className={`protocol-chart-toggle${isChartOpen ? ' open' : ''}`}

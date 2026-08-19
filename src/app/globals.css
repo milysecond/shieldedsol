@@ -343,6 +343,11 @@ body {
 }
 .proto-block {
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  scroll-margin-top: 5rem;
+}
+.proto-block.focused {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .proto-row {
   display: grid;
@@ -489,6 +494,30 @@ body {
   align-items: center;
   gap: 0.65rem 1rem;
   padding: 0 1rem 0 1.85rem;
+}
+.proto-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.proto-share-btn {
+  min-height: 32px;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg2);
+  color: var(--text2);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.proto-share-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface-hover);
 }
 .chart-panel {
   width: 100%;
