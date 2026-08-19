@@ -28,6 +28,11 @@ const endpoints = [
     note: 'Per-protocol history',
   },
   { method: 'GET', path: '/api/v1/openapi.json', note: 'OpenAPI 3.1' },
+  {
+    method: 'WEB',
+    path: '/p/{slug}',
+    note: 'Protocol deeplink (e.g. /p/voidify)',
+  },
 ];
 
 export default function DevelopersPage() {

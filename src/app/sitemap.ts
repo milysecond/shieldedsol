@@ -22,6 +22,25 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'weekly',
       priority: 0.75,
     },
+    // Protocol deeplinks
+    ...[
+      'privacy-cash',
+      'umbra',
+      'arcium',
+      'magicblock',
+      'helius-rings',
+      'light-protocol',
+      'turbine',
+      'vanish-trade',
+      'voidify',
+      'mixoor',
+      'elusiv',
+    ].map((slug) => ({
+      url: `${SITE_URL}/p/${slug}`,
+      lastModified: now,
+      changeFrequency: 'hourly' as const,
+      priority: 0.65,
+    })),
     {
       url: `${SITE_URL}/developers`,
       lastModified: now,

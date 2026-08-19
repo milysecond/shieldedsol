@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { slugifyProtocol, matchProtocolName } from '@/lib/slug';
+
+export { slugifyProtocol, matchProtocolName };
 
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -44,28 +47,4 @@ export function jsonErr(
 
 export function optionsOk() {
   return new NextResponse(null, { status: 204, headers: CORS });
-}
-
-export function slugifyProtocol(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-export function matchProtocolName(
-  protocols: { name: string }[],
-  key: string
-): string | null {
-  const raw = decodeURIComponent(key).trim();
-  if (!raw) return null;
-  const lower = raw.toLowerCase();
-  const slug = slugifyProtocol(raw);
-  const hit = protocols.find(
-    (p) =>
-      p.name === raw ||
-      p.name.toLowerCase() === lower ||
-      slugifyProtocol(p.name) === slug
-  );
-  return hit?.name || null;
 }
