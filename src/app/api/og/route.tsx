@@ -12,12 +12,14 @@ type Proto = {
   tvl: number;
   kind?: string;
   status?: string;
+  pools?: { asset?: string; balance?: number; usd?: number }[];
 };
 
+/** Compact social/USD labels — short so X doesn't wrap mid-token */
 function fmtUsd(n: number): string {
   if (!n || n <= 0) return '--';
   if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return '$' + (n / 1e3).toFixed(2) + 'K';
+  if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
   return (
     '$' +
     n.toLocaleString('en-US', {
@@ -43,6 +45,14 @@ function fmtUsdFull(n: number): string {
       maximumFractionDigits: 0,
     })
   );
+}
+
+/** True SOL balances only — never invent SOL from ARX/USDC USD */
+function nativeSolBalance(p: Proto): number {
+  const pools = Array.isArray(p.pools) ? p.pools : [];
+  return pools
+    .filter((x) => String(x.asset || '').toUpperCase() === 'SOL')
+    .reduce((s, x) => s + (Number(x.balance) || 0), 0);
 }
 
 async function loadFont(weight: 400 | 700) {
@@ -139,9 +149,10 @@ export async function GET() {
       ? totalTvl
       : livePools.reduce((s, p) => s + p.tvl, 0);
   const poolProtos = livePools.slice(0, 3);
-  const denom = liveTotal > 0 ? liveTotal : 1;
-  const solTvl = solPrice > 0 ? liveTotal / solPrice : 0;
-  const topShare = poolProtos[0] ? (poolProtos[0].tvl / denom) * 100 : 0;
+    const denom = liveTotal > 0 ? liveTotal : 1;
+    // SOL-equivalent of total USD (aggregate only — not per non-SOL pool)
+    const solEq = solPrice > 0 ? liveTotal / solPrice : 0;
+    const topShare = poolProtos[0] ? (poolProtos[0].tvl / denom) * 100 : 0;
 
   let logoSrc = `${SITE_URL}/logo.png`;
   try {
@@ -304,7 +315,7 @@ export async function GET() {
             </div>
           </div>
 
-          {/* hero numbers */}
+          {/* hero numbers — USD primary (matches dashboard + share intent) */}
           <div
             style={{
               display: 'flex',
@@ -336,7 +347,7 @@ export async function GET() {
                 style={{
                   display: 'flex',
                   alignItems: 'baseline',
-                  gap: 12,
+                  gap: 10,
                   fontSize: 72,
                   fontWeight: 700,
                   letterSpacing: -2,
@@ -344,28 +355,23 @@ export async function GET() {
                   lineHeight: 1,
                 }}
               >
-                {fmtSol(solTvl)}
-                <span
+                {fmtUsdFull(liveTotal)}
+              </div>
+              {solEq > 0 ? (
+                <div
                   style={{
-                    fontSize: 28,
-                    color: '#9945FF',
-                    letterSpacing: 1,
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: 8,
+                    fontSize: 26,
+                    color: '#c4b5fd',
                     fontWeight: 700,
                   }}
                 >
-                  SOL
-                </span>
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  fontSize: 32,
-                  color: '#c4b5fd',
-                  fontWeight: 700,
-                }}
-              >
-                {fmtUsdFull(liveTotal)}
-              </div>
+                  ≈ {fmtSol(solEq)}
+                  <span style={{ fontSize: 18, color: '#9945FF' }}>SOL</span>
+                </div>
+              ) : null}
             </div>
             <div
               style={{
@@ -439,6 +445,7 @@ export async function GET() {
             {poolProtos.map((p, i) => {
               const share = (p.tvl / denom) * 100;
               const alpha = [0.95, 0.7, 0.48][i] || 0.3;
+              const solBal = nativeSolBalance(p);
               return (
                 <div
                   key={p.name}
@@ -492,24 +499,24 @@ export async function GET() {
                       display: 'flex',
                       gap: 14,
                       alignItems: 'baseline',
-                      fontSize: 20,
-                      color: '#c4b5fd',
+                      fontSize: 22,
+                      color: '#f5f3ff',
                       fontWeight: 700,
                     }}
                   >
-                    <span style={{ display: 'flex' }}>
-                      {fmtSol(solPrice > 0 ? p.tvl / solPrice : 0)} SOL
-                    </span>
-                    <span
-                      style={{
-                        display: 'flex',
-                        color: '#7c7394',
-                        fontWeight: 400,
-                        fontSize: 17,
-                      }}
-                    >
-                      {fmtUsd(p.tvl)}
-                    </span>
+                    <span style={{ display: 'flex' }}>{fmtUsd(p.tvl)}</span>
+                    {solBal > 0 ? (
+                      <span
+                        style={{
+                          display: 'flex',
+                          color: '#a78bfa',
+                          fontWeight: 600,
+                          fontSize: 17,
+                        }}
+                      >
+                        {fmtSol(solBal)} SOL
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               );

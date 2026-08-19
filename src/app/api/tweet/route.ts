@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PROTOCOL_X_HANDLES, SITE_URL } from '@/lib/constants';
 
-function fmtUsd(n: number): string {
+function fmtShareUsd(n: number): string {
   if (!n || n <= 0) return '$--';
   if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
-  return '$' + n.toFixed(0);
+  if (n >= 1e3) return '$' + Math.round(n / 1e3) + 'K';
+  return '$' + Math.round(n);
 }
 
 async function fetchTVL() {
   let tvlFormatted = '$--';
   let change = '';
-  let topLine = '';
+  let topBlock = '';
   let tags = '@shieldedsol';
 
   try {
@@ -21,7 +21,7 @@ async function fetchTVL() {
     });
     const data = await apiRes.json();
     const totalTvl = Number(data?.totalTvl) || 0;
-    tvlFormatted = fmtUsd(totalTvl);
+    tvlFormatted = fmtShareUsd(totalTvl);
 
     const live = (data?.protocols || [])
       .filter(
@@ -33,13 +33,13 @@ async function fetchTVL() {
           (b.tvl || 0) - (a.tvl || 0)
       );
 
-    topLine = live
+    topBlock = live
       .slice(0, 3)
       .map(
         (p: { name?: string; tvl?: number }) =>
-          `${p.name} ${fmtUsd(p.tvl || 0)}`
+          `${p.name}  ${fmtShareUsd(p.tvl || 0)}`
       )
-      .join(' · ');
+      .join('\n');
 
     const lead = live[0]?.name ? PROTOCOL_X_HANDLES[live[0].name] : null;
     tags = ['@shieldedsol', lead ? `@${lead}` : null]
@@ -83,7 +83,7 @@ async function fetchTVL() {
     console.error('Failed to fetch 24h change:', e);
   }
 
-  return { tvlFormatted, change, topLine, tags };
+  return { tvlFormatted, change, topBlock, tags };
 }
 
 async function postTweet(text: string) {
@@ -98,7 +98,7 @@ async function postTweet(text: string) {
     authToken,
     text,
     proxy: '142.111.48.253:7030@khdrutfi:6k4w4qxpoqep',
-    media: [{ url: `${SITE_URL}/api/og?v=20260820` }],
+    media: [{ url: `${SITE_URL}/api/og?v=20260820c` }],
   };
 
   const response = await fetch(
@@ -133,14 +133,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { tvlFormatted, change, topLine, tags } = await fetchTVL();
+    const { tvlFormatted, change, topBlock, tags } = await fetchTVL();
 
-    // Short, 3rd person, no hashtags
     const tweetText = [
-      `Solana privacy pool TVL is ${tvlFormatted}${
+      `Solana privacy pool TVL: ${tvlFormatted}${
         change ? ` (${change} 24h)` : ''
-      }.`,
-      topLine || null,
+      }`,
+      topBlock || null,
       tags,
       'shieldedsol.com',
     ]
