@@ -4,7 +4,7 @@ import { SITE_URL, SITE_NAME, GA_ID } from '@/lib/constants';
 import './globals.css';
 
 /** Bump with OG design changes so X/TG/FB refetch the image */
-const OG_IMAGE = `${SITE_URL}/api/og?v=20260820`;
+const OG_IMAGE = `${SITE_URL}/api/og?v=20260820c`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

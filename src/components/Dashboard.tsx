@@ -343,19 +343,27 @@ export default function Dashboard() {
 
   const getShareText = useCallback(
       (kind: 'x' | 'telegram' | 'copy' = 'copy') => {
-      // Share always uses USD for clarity on social
-      const tvl = data ? fmtUsd(data.totalTvl) : '--';
+        // Compact USD — short tokens so X doesn't wrap mid-name
+        const fmtShare = (n: number) => {
+          if (!n || n <= 0) return '$--';
+          if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+          if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
+          return `$${Math.round(n)}`;
+        };
+
+        const tvl = data ? fmtShare(data.totalTvl) : '--';
         const live = (data?.protocols || [])
           .filter(
             (p) => p.kind !== 'infra' && p.status === 'live' && p.tvl > 0
           )
           .sort((a, b) => b.tvl - a.tvl);
-        const top = live
-          .slice(0, 3)
-          .map((p) => `${p.name} ${fmtUsd(p.tvl)}`)
-          .join(' · ');
 
-        // X: short + few tags. Copy/TG can be slightly fuller.
+        // One protocol per line — prevents "Arciu / m $85K" mid-wrap
+        const topBlock = live
+          .slice(0, 3)
+          .map((p) => `${p.name}  ${fmtShare(p.tvl)}`)
+          .join('\n');
+
         const leadHandle = live[0]
           ? PROTOCOL_X_HANDLES[live[0].name]
           : null;
@@ -377,16 +385,18 @@ export default function Dashboard() {
                 )
               ).join(' ');
 
+        const lines = [
+          `Solana privacy pool TVL: ${tvl}`,
+          topBlock || null,
+          tags || null,
+        ].filter(Boolean);
+
         if (kind === 'x') {
-          // No trailing URL — intent uses &url=
-          return `Solana privacy pool TVL: ${tvl}${
-            top ? `\n${top}` : ''
-          }${tags ? `\n\n${tags}` : ''}`;
+          // URL via intent &url= (card). Keep body clean.
+          return lines.join('\n\n');
         }
 
-        return `Solana privacy pool TVL: ${tvl}${top ? `\n${top}` : ''}${
-          tags ? `\n\n${tags}` : ''
-        }\n\nhttps://www.shieldedsol.com`;
+        return [...lines, 'https://www.shieldedsol.com'].join('\n\n');
       },
       [data]
     );
