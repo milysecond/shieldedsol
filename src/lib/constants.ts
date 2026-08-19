@@ -105,7 +105,8 @@ export const PROTOCOL_DEFINITIONS = [
   {
     name: 'Elusiv',
     status: 'sunset' as const,
-    url: 'https://elusiv.io',
+    url: 'https://x.com/elusivprivacy',
+    linkText: 'sunset · @elusivprivacy',
     pools: ['SOL', 'USDC', 'USDT', 'BONK'],
   },
 ];
@@ -117,17 +118,18 @@ export const SOLANA_RPC = 'https://viviyan-bkj12u-fast-mainnet.helius-rpc.com';
 export const DONATION_WALLET =
   'shLDydVFjPS6zyYo1WJ6JAVeqHf2PAxa2jiLDb8Tudt';
 
-/** X handles for share/tweet tags (no @ prefix) */
+/** X handles for share/tweet tags (no @ prefix) — verified 2026-08 */
 export const PROTOCOL_X_HANDLES: Record<string, string> = {
   'Privacy Cash': 'theprivacycash',
   Umbra: 'UmbraPrivacy',
-  Arcium: 'ArciumHQ',
+  Arcium: 'Arcium',
   MagicBlock: 'magicblock',
-  'Helius Rings': 'heliuslabs',
-  'Light Protocol': 'heliuslabs',
+  'Helius Rings': 'Helius',
+  'Light Protocol': 'Helius',
   'Vanish Trade': 'vanishTrade',
   Mixoor: 'Mixoordotfun',
   Turbine: 'turbinecash',
+  Elusiv: 'elusivprivacy',
 };
 
 export function solAddressUrl(address: string): string {
