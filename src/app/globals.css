@@ -2101,3 +2101,168 @@ footer a:hover {
 .dev-footer a:hover {
   color: var(--accent);
 }
+
+/* Lookout — Things to Look Out For */
+.lookout-page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: max(1.25rem, env(safe-area-inset-top)) 1.25rem
+    max(3rem, env(safe-area-inset-bottom));
+}
+.lookout-header {
+  margin-bottom: 1.25rem;
+}
+.lookout-back {
+  color: var(--text3);
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+.lookout-back:hover {
+  color: var(--accent);
+}
+.lookout-page h1 {
+  font-size: 1.55rem;
+  margin: 0.75rem 0 0.45rem;
+  letter-spacing: -0.02em;
+}
+.lookout-lead {
+  color: var(--text2);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.lookout-lead strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.lookout-note {
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.lookout-note p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text3);
+  line-height: 1.45;
+}
+.lookout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.lookout-card {
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg2);
+}
+.lookout-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+.lookout-card h2 {
+  font-size: 1.02rem;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.lookout-badge {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text3);
+}
+.lookout-badge.status-rail {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.08);
+}
+.lookout-badge.status-hybrid {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+}
+.lookout-badge.status-watch {
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.35);
+  background: rgba(167, 139, 250, 0.08);
+}
+.lookout-badge.status-infra {
+  color: var(--text2);
+  border-color: var(--border);
+  background: var(--surface);
+}
+.lookout-badge.status-waitlist,
+.lookout-badge.status-soon {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.08);
+}
+.lookout-blurb {
+  margin: 0 0 0.55rem;
+  font-size: 0.84rem;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.lookout-why {
+  margin: 0 0 0.7rem;
+  font-size: 0.78rem;
+  color: var(--text3);
+  line-height: 1.45;
+}
+.lookout-why-label {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text4);
+  margin-bottom: 0.2rem;
+}
+.lookout-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+.lookout-link {
+  font-size: 0.78rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+.lookout-link:hover {
+  text-decoration: underline;
+}
+.lookout-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.25rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+.lookout-footer a {
+  color: var(--text3);
+  text-decoration: none;
+}
+.lookout-footer a:hover {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .lookout-page {
+    padding-left: max(0.85rem, env(safe-area-inset-left));
+    padding-right: max(0.85rem, env(safe-area-inset-right));
+  }
+  .lookout-card-top {
+    align-items: flex-start;
+  }
+}

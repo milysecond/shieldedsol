@@ -547,6 +547,7 @@ export default function Dashboard() {
     'Helius Rings',
     'Vanish Trade',
     'Turbine',
+    'Voidify',
     'Mixoor',
     'Light Protocol',
     'Elusiv',
@@ -917,7 +918,10 @@ export default function Dashboard() {
                     {pools.length > 0 && (
                       <div className="proto-pools">
                         {pools.map((pool) => (
-                          <div key={pool.asset} className="proto-pool-chip">
+                          <div
+                            key={`${pool.asset}-${pool.address || 'na'}`}
+                            className="proto-pool-chip"
+                          >
                             <span className="pool-native">
                               {fmtPoolNative(pool.balance, pool.asset)}{' '}
                               {pool.asset}
@@ -1161,6 +1165,7 @@ export default function Dashboard() {
         </div>
         <div className="footer-right">
           <a href="/history">history</a>
+          <a href="/lookout">lookout</a>
           <a href="/developers">developers</a>
           <a
             href="https://t.me/metasal"
