@@ -1164,19 +1164,52 @@ export default function Dashboard({
                       <div className="proto-share-actions" role="group" aria-label={`Share ${name}`}>
                         <button
                           type="button"
-                          className="proto-share-btn"
-                          title="Copy deeplink"
-                          aria-label={`Copy deeplink for ${name}`}
+                          className={`proto-share-btn icon${
+                            linkCopied === name ? ' done' : ''
+                          }`}
+                          title={
+                            linkCopied === name ? 'Copied deeplink' : 'Copy deeplink'
+                          }
+                          aria-label={
+                            linkCopied === name
+                              ? `Copied deeplink for ${name}`
+                              : `Copy deeplink for ${name}`
+                          }
                           onClick={(e) => {
                             e.stopPropagation();
                             openProtocolShare(protocol, 'link');
                           }}
                         >
-                          {linkCopied === name ? 'Copied' : 'Link'}
+                          {linkCopied === name ? (
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              aria-hidden
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          ) : (
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              aria-hidden
+                            >
+                              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                            </svg>
+                          )}
                         </button>
                         <button
                           type="button"
-                          className="proto-share-btn"
+                          className="proto-share-btn icon"
                           title="Share on X"
                           aria-label={`Share ${name} on X`}
                           onClick={(e) => {
@@ -1184,11 +1217,19 @@ export default function Dashboard({
                             openProtocolShare(protocol, 'x');
                           }}
                         >
-                          X
+                          <svg
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            aria-hidden
+                          >
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                          </svg>
                         </button>
                         <button
                           type="button"
-                          className="proto-share-btn"
+                          className="proto-share-btn icon"
                           title="Share on Telegram"
                           aria-label={`Share ${name} on Telegram`}
                           onClick={(e) => {
@@ -1196,7 +1237,15 @@ export default function Dashboard({
                             openProtocolShare(protocol, 'telegram');
                           }}
                         >
-                          TG
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            aria-hidden
+                          >
+                            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                          </svg>
                         </button>
                       </div>
                       <button
