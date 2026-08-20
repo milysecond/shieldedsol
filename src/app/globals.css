@@ -608,7 +608,18 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.15s;
+}
+.proto-share-btn.icon {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 10px;
 }
 .proto-share-btn:hover {
   border-color: var(--accent);
@@ -617,6 +628,11 @@ body {
 }
 .proto-share-btn:active {
   transform: scale(0.96);
+}
+.proto-share-btn.done {
+  border-color: var(--live);
+  color: var(--live);
+  background: color-mix(in srgb, var(--live) 12%, transparent);
 }
 .chart-panel {
   width: 100%;
