@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL } from '@/lib/constants';
 import MadeByMilysec from '@/components/MadeByMilysec';
+import BrandMark from '@/components/BrandMark';
 
 export const metadata: Metadata = {
   title: 'Developers — API, MCP & SDK',
@@ -39,9 +40,7 @@ export default function DevelopersPage() {
   return (
     <main className="dev-page">
       <header className="dev-header">
-        <a href="/" className="dev-back">
-          ← {SITE_NAME}
-        </a>
+        <BrandMark href="/" size={28} variant="header" />
         <h1>Developers</h1>
         <p className="dev-lead">
           Public API, TypeScript SDK, and MCP server for Solana privacy TVL.
@@ -98,6 +97,8 @@ const hist = await client.tvlHistory('30d');`}</pre>
       </section>
 
       <footer className="dev-footer">
+        <BrandMark href="/" size={20} variant="footer" />
+        <a href="/brand">Brand</a>
         <a href="/api/v1/openapi.json">OpenAPI</a>
         <a href="https://github.com/milysecond/shieldedsol">GitHub</a>
         <a href="/lookout">Lookout</a>

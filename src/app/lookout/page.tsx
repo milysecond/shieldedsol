@@ -6,6 +6,7 @@ import {
   type LookoutStatus,
 } from '@/lib/lookout';
 import MadeByMilysec from '@/components/MadeByMilysec';
+import BrandMark from '@/components/BrandMark';
 
 export const metadata: Metadata = {
   title: 'Things to Look Out For',
@@ -26,9 +27,7 @@ export default function LookoutPage() {
   return (
     <main className="lookout-page">
       <header className="lookout-header">
-        <a href="/" className="lookout-back">
-          ← {SITE_NAME}
-        </a>
+        <BrandMark href="/" size={28} variant="header" />
         <h1>Things to Look Out For</h1>
         <p className="lookout-lead">
           Privacy-related projects on or around Solana that are{' '}
@@ -86,8 +85,10 @@ export default function LookoutPage() {
       </div>
 
       <footer className="lookout-footer">
+        <BrandMark href="/" size={20} variant="footer" />
         <a href="/">dashboard</a>
         <a href="/history">history</a>
+        <a href="/brand">brand</a>
         <a href="/developers">developers</a>
         <MadeByMilysec height={24} />
       </footer>
