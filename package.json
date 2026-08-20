@@ -26,6 +26,7 @@
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.95.0",
     "@vercel/og": "^0.8.6",
+    "border-beam": "^1.3.0",
     "canvas": "^3.2.1",
     "dotenv": "^17.2.3",
     "esbuild": "0.25.4",
