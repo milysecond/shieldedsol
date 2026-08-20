@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import DonationWallet from './DonationWallet';
 import LoadOrb from './LoadOrb';
 import MadeByMilysec from './MadeByMilysec';
+import BeamShell from './BeamShell';
 import { PROTOCOL_X_HANDLES, SITE_URL } from '@/lib/constants';
 import {
   matchProtocolName,
@@ -158,6 +159,7 @@ export default function Dashboard({
   const [linkCopied, setLinkCopied] = useState<string | null>(null);
   const deeplinkApplied = useRef(false);
   const [unit, setUnit] = useState<DisplayUnit>('sol');
+  const [unitKey, setUnitKey] = useState(0);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +188,10 @@ export default function Dashboard({
   }, []);
 
   const setDisplayUnit = useCallback((next: DisplayUnit) => {
-    setUnit(next);
+    setUnit((prev) => {
+      if (prev !== next) setUnitKey((k) => k + 1);
+      return next;
+    });
     localStorage.setItem('display-unit', next);
     localStorage.setItem('displayUnit', next);
   }, []);
@@ -708,7 +713,23 @@ export default function Dashboard({
 
   return (
     <div className="app-shell">
-      {copied && <div className="copy-toast">Copied to clipboard</div>}
+      {copied && (
+        <div className="copy-toast" role="status">
+          <svg
+            className="copy-toast-check"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            aria-hidden
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Copied
+        </div>
+      )}
       <header className="topbar">
         <button
           type="button"
@@ -817,19 +838,32 @@ export default function Dashboard({
               )}
             </button>
           </div>
-          <span className={`live-pill${loading ? ' is-loading' : ''}`}>
-            {loading ? (
+          {loading ? (
+            <span className="live-pill is-loading">
               <LoadOrb
-                state="breathing"
+                state="connecting"
                 size={20}
                 theme={lightMode ? 'light' : 'dark'}
                 label="Updating"
               />
-            ) : (
-              <span className="live-dot" />
-            )}
-            {loading ? 'sync' : 'live'}
-          </span>
+              sync
+            </span>
+          ) : (
+            <BeamShell
+              size="sm"
+              colorVariant="ocean"
+              theme={lightMode ? 'light' : 'dark'}
+              duration={3.2}
+              borderRadius={999}
+              strength={1.15}
+              className="live-beam"
+            >
+              <span className="live-pill live-pill-solid">
+                <span className="live-dot" />
+                live
+              </span>
+            </BeamShell>
+          )}
         </div>
       </header>
 
@@ -850,7 +884,7 @@ export default function Dashboard({
             className={`hero-tvl${loading && !data ? ' loading-tvl' : ' revealed'}`}
           >
             {data ? (
-              <>
+              <span key={`${unit}-${unitKey}`} className="hero-tvl-value flip-in">
                 {unit === 'usd' ? (
                   <span className="hero-currency">$</span>
                 ) : null}
@@ -858,7 +892,7 @@ export default function Dashboard({
                 {unit === 'sol' ? (
                   <span className="hero-unit">SOL</span>
                 ) : null}
-              </>
+              </span>
             ) : loading ? (
               <LoadOrb
                 state="searching"
@@ -1052,7 +1086,7 @@ export default function Dashboard({
                   <span className="proto-name">
                     {name}
                     {share != null && share >= 0.5 && (
-                      <span className="proto-share">{share.toFixed(1)}%</span>
+                      <span className="proto-pct">{share.toFixed(1)}%</span>
                     )}
                   </span>
                   <span
@@ -1127,7 +1161,7 @@ export default function Dashboard({
                           ↗
                         </a>
                       )}
-                      <div className="proto-share" role="group" aria-label={`Share ${name}`}>
+                      <div className="proto-share-actions" role="group" aria-label={`Share ${name}`}>
                         <button
                           type="button"
                           className="proto-share-btn"
@@ -1332,7 +1366,18 @@ export default function Dashboard({
                 required
               />
               <button type="submit" disabled={subscribeState === 'loading'}>
-                {subscribeState === 'loading' ? '...' : 'Subscribe'}
+                {subscribeState === 'loading' ? (
+                  <span className="subscribe-loading">
+                    <LoadOrb
+                      state="working"
+                      size={20}
+                      theme={lightMode ? 'light' : 'dark'}
+                      label="Subscribing"
+                    />
+                  </span>
+                ) : (
+                  'Subscribe'
+                )}
               </button>
             </form>
           )}

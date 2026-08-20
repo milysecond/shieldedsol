@@ -131,12 +131,35 @@ body {
   color: var(--text3);
   font-size: 0.8rem;
 }
+.live-pill-solid {
+  padding: 0.28rem 0.7rem 0.28rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--live) 35%, var(--border));
+  background: color-mix(in srgb, var(--live) 8%, var(--bg2));
+  color: var(--text2);
+}
+.live-beam {
+  display: inline-flex;
+  border-radius: 999px;
+}
 .live-dot {
   width: 8px;
   height: 8px;
   border-radius: 999px;
   background: var(--live);
   box-shadow: 0 0 10px color-mix(in srgb, var(--live) 70%, transparent);
+  animation: live-pulse 2.2s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.92);
+  }
 }
 .hero-main {
   flex: 1;
@@ -204,6 +227,24 @@ body {
   font-variant-numeric: tabular-nums;
   color: var(--text);
   animation: fade-in 0.65s ease 0.08s both;
+}
+.hero-tvl-value {
+  display: inline-block;
+}
+.flip-in {
+  animation: flip-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes flip-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em) scale(0.98);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
 }
 .hero-currency {
   color: var(--text2);
@@ -280,6 +321,19 @@ body {
   .unit-thumb {
     transition: none;
   }
+  .flip-in,
+  .details-in,
+  .proto-block.open .proto-details,
+  .copy-toast,
+  .copy-toast-check polyline,
+  .live-dot,
+  .proto-block.focused::after,
+  .subscribe-ok {
+    animation: none !important;
+  }
+  .live-dot {
+    transform: none;
+  }
 }
 .comp-bar-wrap {
   width: 100%;
@@ -344,10 +398,52 @@ body {
 .proto-block {
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   scroll-margin-top: 5rem;
+  position: relative;
+  transition: background 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .proto-block.focused {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
   box-shadow: inset 3px 0 0 var(--accent);
+}
+.proto-block.focused::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 20%, transparent) 15%,
+    var(--accent) 50%,
+    color-mix(in srgb, var(--accent) 20%, transparent) 85%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: focus-beam 2.4s linear infinite;
+  pointer-events: none;
+}
+@keyframes focus-beam {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+.proto-block.open .proto-details {
+  animation: details-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes details-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .proto-row {
   display: grid;
@@ -423,7 +519,7 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.proto-share {
+.proto-pct {
   color: var(--text4);
   font-size: 0.7rem;
 }
@@ -495,7 +591,7 @@ body {
   gap: 0.65rem 1rem;
   padding: 0 1rem 0 1.85rem;
 }
-.proto-share {
+.proto-share-actions {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -512,12 +608,15 @@ body {
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.15s;
 }
 .proto-share-btn:hover {
   border-color: var(--accent);
   color: var(--text);
   background: var(--surface-hover);
+}
+.proto-share-btn:active {
+  transform: scale(0.96);
 }
 .chart-panel {
   width: 100%;
@@ -579,15 +678,42 @@ body {
   bottom: max(1.25rem, env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 50;
-  padding: 0.55rem 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--live) 45%, transparent);
   background: color-mix(in srgb, var(--bg) 92%, black);
   color: var(--live);
   font-size: 0.8rem;
+  font-weight: 600;
   box-shadow: 0 8px 28px var(--shadow);
-  animation: fade-in 0.18s ease both;
+  animation: toast-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
   pointer-events: none;
+}
+.copy-toast-check {
+  flex-shrink: 0;
+}
+.copy-toast-check polyline {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: check-draw 0.35s ease 0.08s forwards;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+@keyframes check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 .follow-btn {
   display: inline-flex;
@@ -645,11 +771,30 @@ body {
   font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s;
+}
+.subscribe-form button:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.subscribe-form button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.subscribe-form button:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}
+.subscribe-loading {
+  display: inline-flex;
+  line-height: 0;
 }
 .subscribe-ok {
   color: var(--accent);
   font-size: 0.8rem;
   text-align: center;
+  animation: details-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .subscribe-err {
   color: var(--danger);
