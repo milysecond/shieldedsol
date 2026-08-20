@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import MadeByMilysec from '@/components/MadeByMilysec';
+import BrandMark from '@/components/BrandMark';
 
 interface HistoryPoint {
   timestamp: string;
@@ -118,13 +119,7 @@ export default function HistoryPage() {
     <div className="history-container" style={{ maxWidth: 1200, margin: '0 auto' }}>
       <header className="history-header site-header">
         <div className="brand">
-          <img
-            src="/logo.svg"
-            alt=""
-            className="logo hero-logo-img history-logo"
-            width={48}
-            height={48}
-          />
+          <BrandMark href="/" size={40} variant="header" withWordmark={false} />
           <div className="brand-text">
             <h1>TVL History</h1>
           </div>
@@ -238,9 +233,13 @@ export default function HistoryPage() {
 
       {/* Footer */}
       <div className="history-footer">
-        Last updated: {new Date().toLocaleTimeString()} &middot;{' '}
-        <a href="https://x.com/shieldedsol" target="_blank" rel="noopener noreferrer">@shieldedsol</a>
-        {' · '}
+        <BrandMark href="/" size={20} variant="footer" />
+        <span>
+          Last updated: {new Date().toLocaleTimeString()} &middot;{' '}
+          <a href="https://x.com/shieldedsol" target="_blank" rel="noopener noreferrer">@shieldedsol</a>
+          {' · '}
+          <a href="/brand">brand</a>
+        </span>
         <MadeByMilysec height={22} className="history-milysec" />
       </div>
     </div>

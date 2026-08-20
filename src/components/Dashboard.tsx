@@ -5,6 +5,7 @@ import DonationWallet from './DonationWallet';
 import LoadOrb from './LoadOrb';
 import MadeByMilysec from './MadeByMilysec';
 import BeamShell from './BeamShell';
+import BrandMark from './BrandMark';
 import { PROTOCOL_X_HANDLES, SITE_URL } from '@/lib/constants';
 import {
   matchProtocolName,
@@ -731,16 +732,7 @@ export default function Dashboard({
         </div>
       )}
       <header className="topbar">
-        <button
-          type="button"
-          className="topbar-brand"
-          title="Copy site URL"
-          onClick={() =>
-            navigator.clipboard.writeText('https://shieldedsol.com')
-          }
-        >
-          shielded.sol
-        </button>
+        <BrandMark href="/" size={28} variant="header" withWordmark />
         <div className="topbar-right">
           <div className="header-actions" aria-label="Actions">
             <button
@@ -1440,6 +1432,7 @@ export default function Dashboard({
 
       <footer className="site-footer">
         <div className="footer-left">
+          <BrandMark href="/" size={22} variant="footer" withWordmark />
           <button
             className={`refresh${loading ? ' is-loading' : ''}`}
             onClick={refresh}
@@ -1464,6 +1457,7 @@ export default function Dashboard({
         <div className="footer-right">
           <a href="/history">history</a>
           <a href="/lookout">lookout</a>
+          <a href="/brand">brand</a>
           <a href="/developers">developers</a>
           <a
             href="https://t.me/metasal"
