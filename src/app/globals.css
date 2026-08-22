@@ -631,6 +631,53 @@ body {
   gap: 0.45rem;
   padding: 0 1rem 0 1.85rem;
 }
+.proto-programs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem 0.55rem 1.85rem;
+}
+.proto-programs-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text4);
+}
+.proto-program-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.proto-program-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.32rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg2));
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 0.7rem;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.proto-program-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg2));
+}
+.proto-program-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.proto-program-id {
+  font-variant-numeric: tabular-nums;
+  color: var(--text3);
+}
+.proto-program-ext {
+  color: var(--accent);
+  font-weight: 600;
+}
 .proto-pool-chip {
   display: inline-flex;
   flex-direction: column;
