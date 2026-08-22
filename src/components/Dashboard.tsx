@@ -6,7 +6,7 @@ import LoadOrb from './LoadOrb';
 import MadeByMilysec from './MadeByMilysec';
 import BeamShell from './BeamShell';
 import BrandMark from './BrandMark';
-import { PROTOCOL_X_HANDLES, SITE_URL } from '@/lib/constants';
+import { PROTOCOL_X_HANDLES, SITE_URL, programWatchUrl } from '@/lib/constants';
 import {
   matchProtocolName,
   protocolDeepLink,
@@ -28,6 +28,7 @@ interface Protocol {
   pools: Pool[];
   stats?: string;
   kind?: 'pool' | 'infra';
+  programs?: { id: string; label: string }[];
 }
 interface ProtocolsResponse {
   solPrice: number;
@@ -1137,6 +1138,32 @@ export default function Dashboard({
                             ) : null}
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {protocol.programs && protocol.programs.length > 0 && (
+                      <div className="proto-programs">
+                        <span className="proto-programs-label">Programs</span>
+                        <div className="proto-program-chips">
+                          {protocol.programs.map((prog) => (
+                            <a
+                              key={prog.id}
+                              className="proto-program-chip"
+                              href={programWatchUrl(prog.id)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={prog.id}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span className="proto-program-name">
+                                {prog.label}
+                              </span>
+                              <span className="proto-program-id">
+                                {prog.id.slice(0, 4)}…{prog.id.slice(-4)}
+                              </span>
+                              <span className="proto-program-ext">watch ↗</span>
+                            </a>
+                          ))}
+                        </div>
                       </div>
                     )}
                     <div className="proto-actions">

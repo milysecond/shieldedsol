@@ -19,6 +19,31 @@ export const MINTS = {
 export const ARCIUM_STAKING_PROGRAM =
   'ArcStnN9zZZVB5WjgPhLHjYpY7Gb29mzb96ySsb1kxgq';
 
+/** Privacy Cash mainnet program */
+export const PRIVACY_CASH_PROGRAM =
+  '9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD';
+
+/** Umbra privacy layer (pool owner program from ownership API) */
+export const UMBRA_PROGRAM = 'UMBRAD2ishebJTcgCLkTkNUx1v3GyoAgpTRPeWoLykh';
+
+/** Vanish Trade program (owner of tracked vault) */
+export const VANISH_PROGRAM = 'vanshF62ku4jVVdf8DS47SXuJC1rq8qokGSANAomhey';
+
+/** Mixoor program */
+export const MIXOOR_PROGRAM = 'mixEcfx7w47hvRwb9Nj7UeSQkCz6vZMbRHixMyYMLMb';
+
+/** Elusiv legacy program (sunset) */
+export const ELUSIV_PROGRAM = '4CgyHKuP6yi1vbmcdsArngEKcETR4nZupqYEMk2hEoQd';
+
+/** Light Protocol core programs (Helius acquisition stack) */
+export const LIGHT_SYSTEM_PROGRAM =
+  'SySTEM1eSU2p4BGQfQpimFEWWSC1XDFeun3Nqzz3rT7';
+export const LIGHT_ACCOUNT_COMPRESSION =
+  'compr6CUsB5m2jS4Y3831ztGSTnDpnKJTKS95d64XVq';
+export const LIGHT_REGISTRY = 'Lighton6oQpVkeewmo2mcPTQQp7kYHr4fWpAgJyEmDX';
+export const LIGHT_COMPRESSED_TOKEN =
+  'cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m';
+
 /** Operator stake account data length (bytes) */
 export const ARCIUM_OPERATOR_ACCOUNT_SIZE = 652;
 
@@ -153,3 +178,41 @@ export const PROTOCOL_X_HANDLES: Record<string, string> = {
 export function solAddressUrl(address: string): string {
   return `https://sol.new/address/${address}`;
 }
+
+/** ProgramWatch — Solana program explorer */
+export function programWatchUrl(programId: string): string {
+  return `https://programwatch.dev/${programId}`;
+}
+
+export type ProtocolProgram = {
+  id: string;
+  label: string;
+};
+
+/**
+ * On-chain program IDs per protocol (verified executable accounts).
+ * Linked in UI via programwatch.dev/{id}
+ */
+export const PROTOCOL_PROGRAMS: Record<string, ProtocolProgram[]> = {
+  'Privacy Cash': [
+    { id: PRIVACY_CASH_PROGRAM, label: 'Privacy Cash' },
+  ],
+  Umbra: [{ id: UMBRA_PROGRAM, label: 'Umbra' }],
+  Arcium: [{ id: ARCIUM_STAKING_PROGRAM, label: 'Arcium staking' }],
+  MagicBlock: [{ id: MAGICBLOCK_PROGRAM, label: 'MagicBlock SPL' }],
+  Voidify: [
+    { id: VOIDIFY_CORE_PROGRAM, label: 'Voidify core' },
+    { id: VOIDIFY_USER_VOID_PROGRAM, label: 'User VOID' },
+  ],
+  'Vanish Trade': [{ id: VANISH_PROGRAM, label: 'Vanish' }],
+  Mixoor: [{ id: MIXOOR_PROGRAM, label: 'Mixoor' }],
+  Elusiv: [{ id: ELUSIV_PROGRAM, label: 'Elusiv' }],
+  'Light Protocol': [
+    { id: LIGHT_SYSTEM_PROGRAM, label: 'System' },
+    { id: LIGHT_ACCOUNT_COMPRESSION, label: 'Compression' },
+    { id: LIGHT_REGISTRY, label: 'Registry' },
+    { id: LIGHT_COMPRESSED_TOKEN, label: 'cToken' },
+  ],
+  // Turbine: zSOL mint tracked; no stable public program ID yet
+  // Helius Rings: private beta — no public mainnet program yet
+};

@@ -4,6 +4,7 @@ import {
   SOLANA_RPC,
   ARCIUM_STAKING_PROGRAM,
   ARCIUM_OPERATOR_ACCOUNT_SIZE,
+  PROTOCOL_PROGRAMS,
 } from './constants';
 
 const RPC_URLS = [
@@ -124,6 +125,8 @@ export interface Protocol {
   stats?: string;
   /** infra = compute network without pool TVL */
   kind?: 'pool' | 'infra';
+  /** On-chain program IDs (ProgramWatch) */
+  programs?: { id: string; label: string }[];
 }
 
 export interface ProtocolsResponse {
@@ -755,6 +758,12 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     if (ra !== rb) return ra - rb;
     return b.tvl - a.tvl;
   });
+
+  // Attach verified program IDs for ProgramWatch links
+  for (const p of protocols) {
+    const progs = PROTOCOL_PROGRAMS[p.name];
+    if (progs?.length) p.programs = progs;
+  }
 
   // Total = live pool TVL only (exclude sunset residual + infra/upcoming zeros)
   const totalTvl = protocols.reduce((sum, p) => {
