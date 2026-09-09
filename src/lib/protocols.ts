@@ -326,7 +326,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     voidifyResult,
   ] = await Promise.allSettled([
     (async () => {
-      const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE, MINTS.ARX].join(',');
+      const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE, MINTS.ARX, MINTS.ZEC].join(',');
       const priceRes = await fetch(
         `https://api.jup.ag/price/v3?ids=${mintIds}`,
         {
@@ -370,6 +370,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
           USDT: MINTS.USDT,
           ORE: MINTS.ORE,
           stORE: MINTS.stORE,
+          ZEC: MINTS.ZEC,
         }
       );
       return {
@@ -378,6 +379,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
         USDT: tokens.USDT || 0,
         ORE: tokens.ORE || 0,
         stORE: tokens.stORE || 0,
+        ZEC: tokens.ZEC || 0,
       };
     })(),
     fetchUmbra(),
@@ -399,12 +401,14 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
   let bonkPrice = 0;
   let orePrice = 0;
   let arxPrice = 0;
+  let zecPrice = 0;
   if (priceResult.status === 'fulfilled') {
     const priceData = priceResult.value;
     solPrice = priceData?.[MINTS.SOL]?.usdPrice || 180;
     bonkPrice = priceData?.[MINTS.BONK]?.usdPrice || 0;
     orePrice = priceData?.[MINTS.ORE]?.usdPrice || 0;
     arxPrice = priceData?.[MINTS.ARX]?.usdPrice || 0;
+    zecPrice = priceData?.[MINTS.ZEC]?.usdPrice || 0;
   } else {
     console.error('Jupiter price fetch error:', priceResult.reason);
   }
@@ -465,7 +469,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
   const pcBalances =
     pcResult.status === 'fulfilled'
       ? pcResult.value
-      : { SOL: 0, USDC: 0, USDT: 0, ORE: 0, stORE: 0 };
+      : { SOL: 0, USDC: 0, USDT: 0, ORE: 0, stORE: 0, ZEC: 0 };
 
   let umbraPools: Pool[] = [];
   let umbraTvl = 0;
@@ -543,12 +547,19 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
           balance: pcBalances.ORE + pcBalances.stORE,
           usd: (pcBalances.ORE + pcBalances.stORE) * orePrice,
         },
+        {
+          asset: 'ZEC',
+          address: POOL_ADDRESSES.PRIVACY_CASH_ZEC,
+          balance: pcBalances.ZEC,
+          usd: pcBalances.ZEC * zecPrice,
+        },
       ],
       tvl:
         pcBalances.SOL * solPrice +
         pcBalances.USDC +
         pcBalances.USDT +
-        (pcBalances.ORE + pcBalances.stORE) * orePrice,
+        (pcBalances.ORE + pcBalances.stORE) * orePrice +
+        pcBalances.ZEC * zecPrice,
     },
     {
       name: 'Umbra',
