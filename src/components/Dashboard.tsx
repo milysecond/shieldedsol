@@ -6,7 +6,7 @@ import LoadOrb from './LoadOrb';
 import MadeByMilysec from './MadeByMilysec';
 import BeamShell from './BeamShell';
 import BrandMark from './BrandMark';
-import { PROTOCOL_X_HANDLES, SITE_URL, programWatchUrl } from '@/lib/constants';
+import { PROTOCOL_X_HANDLES, SITE_URL, programWatchUrl, solAddressUrl } from '@/lib/constants';
 import {
   matchProtocolName,
   protocolDeepLink,
@@ -1128,12 +1128,12 @@ export default function Dashboard({
                             {pool.address ? (
                               <a
                                 className="pool-link"
-                                href={`https://sol.new/address/${pool.address}`}
+                                href={solAddressUrl(pool.address)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                sol.new ↗
+                                Orb ↗
                               </a>
                             ) : null}
                           </div>

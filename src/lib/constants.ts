@@ -180,7 +180,11 @@ export const PROTOCOL_X_HANDLES: Record<string, string> = {
 };
 
 export function solAddressUrl(address: string): string {
-  return `https://sol.new/address/${address}`;
+  return `https://orbmarkets.io/address/${address}`;
+}
+
+export function solTxUrl(signature: string): string {
+  return `https://orbmarkets.io/tx/${signature}`;
 }
 
 /** ProgramWatch — Solana program explorer */

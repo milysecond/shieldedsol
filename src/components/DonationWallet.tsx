@@ -40,7 +40,7 @@ export default function DonationWallet() {
             target="_blank"
             rel="noopener noreferrer"
           >
-            sol.new ↗
+            Orb ↗
           </a>
           <a className="donation-link" href={`solana:${DONATION_WALLET}`}>
             Open wallet
