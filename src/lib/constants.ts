@@ -13,6 +13,8 @@ export const MINTS = {
   ZSOL: 'zso1EF4k8HNteye34aD8w2Fm6pYVWMDgkgWCUrMLip1',
   /** Arcium network token */
   ARX: 'ARXwZkNAtzPfdcoqQiduJn8EPv9fKiDfGn2KyggyDrFs',
+  /** Privacy Cash ZEC (Solana wrapped) */
+  ZEC: 'A7bdiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS',
 } as const;
 
 /** Arcium on-chain staking program (operator stake accounts) */
@@ -50,6 +52,8 @@ export const ARCIUM_OPERATOR_ACCOUNT_SIZE = 652;
 export const POOL_ADDRESSES = {
   PRIVACY_CASH_SOL: '4AV2Qzp3N4c9RfzyEbNZs2wqWfW4EwKnnxFAZCndvfGh',
   PRIVACY_CASH_TOKEN: '2vV7xhCMWRrcLiwGoTaTRgvx98ku98TRJKPXhsS8jvBV',
+  /** Privacy Cash ZEC ATA under token owner */
+  PRIVACY_CASH_ZEC: '6PY3Y1zyff8K82Db1PtXPf77nUNx1PVqtpf6fVsVuL12',
   VANISH_TRADE: '8MjKXQgj97NPVNhj9gJrQNP7BibGCGkFMVJ2qZsC58E',
   MIXOOR: 'CS31stgBRPvPMBvRAYgsRTbogNkRdUNTsoyQQLcYp7ZD',
   ELUSIV: 'HszJz1zLnYpK5e8TvsRDPSDrxc19qFuhWrFQG6xY2aMX',
@@ -81,7 +85,7 @@ export const PROTOCOL_DEFINITIONS = [
     name: 'Privacy Cash',
     status: 'live' as const,
     url: 'https://privacycash.org',
-    pools: ['SOL', 'USDC', 'USDT', 'ORE'],
+    pools: ['SOL', 'USDC', 'USDT', 'ORE', 'ZEC'],
   },
   {
     name: 'Umbra',
