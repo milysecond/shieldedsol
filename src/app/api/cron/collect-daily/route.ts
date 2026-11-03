@@ -28,16 +28,20 @@ export async function POST(request: NextRequest) {
       saveTokenPrice(timestamp, 'ORE', data.orePrice),
     ]);
 
+    // Protocols whose live read failed are skipped (gap in history),
+    // rather than recording a fake $0.
+    const recordable = data.protocols.filter((p) => !p.error);
+
     // Save TVL snapshots
     await Promise.all(
-      data.protocols.map((protocol) =>
+      recordable.map((protocol) =>
         saveTvlSnapshot(timestamp, protocol.name, protocol.tvl)
       )
     );
 
     // Save pool balances
     const poolPromises: Promise<void>[] = [];
-    data.protocols.forEach((protocol) => {
+    recordable.forEach((protocol) => {
       protocol.pools.forEach((pool) => {
         poolPromises.push(
           savePoolBalance(

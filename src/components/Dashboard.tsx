@@ -29,6 +29,9 @@ interface Protocol {
   stats?: string;
   kind?: 'pool' | 'infra';
   programs?: { id: string; label: string }[];
+  /** Live data unavailable — tvl is not a real reading */
+  error?: string;
+  stale?: boolean;
 }
 interface ProtocolsResponse {
   solPrice: number;
@@ -1088,7 +1091,7 @@ export default function Dashboard({
                     {loading && !protocol ? '···' : statusText}
                   </span>
                   <span className="proto-usd num">
-                    {isInfra
+                    {isInfra || protocol?.error
                       ? '—'
                       : tvl != null
                         ? fmtValue(tvl)

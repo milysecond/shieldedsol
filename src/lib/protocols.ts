@@ -6,6 +6,7 @@ import {
   ARCIUM_OPERATOR_ACCOUNT_SIZE,
   PROTOCOL_PROGRAMS,
 } from './constants';
+import { fetchUmbraOnchain, fetchUmbraFromLlama } from './umbra';
 
 const RPC_URLS = [
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL,
@@ -18,22 +19,10 @@ const RPC_URLS = [
 const JUP_API_KEY =
   process.env.JUP_API_KEY || '3309da44-211b-4acb-9d31-c36fb54d9459';
 
-const UMBRA_POOLS_URL = 'https://ownership.umbraprivacy.com/api/pools';
 const ARCIUM_NODES_URL =
   'https://explorer.arcium.com/api/v1/nodes?network=mainnet';
 const ARCIUM_CLUSTERS_URL =
   'https://explorer.arcium.com/api/v1/clusters?network=mainnet';
-
-const UMBRA_DISPLAY_ASSETS = [
-  'kmSOL',
-  'wSOL',
-  'USDC',
-  'USDT',
-  'UMBRA',
-  'ZINC',
-  'CASH',
-  'ARX',
-] as const;
 
 /** In-isolate cache so warm requests stay fast */
 let cache: { at: number; data: ProtocolsResponse } | null = null;
@@ -127,6 +116,10 @@ export interface Protocol {
   kind?: 'pool' | 'infra';
   /** On-chain program IDs (ProgramWatch) */
   programs?: { id: string; label: string }[];
+  /** Set when live data could not be fetched; tvl is NOT a real reading */
+  error?: string;
+  /** True when tvl is a last-good / fallback value rather than a fresh read */
+  stale?: boolean;
 }
 
 export interface ProtocolsResponse {
@@ -139,87 +132,65 @@ export interface ProtocolsResponse {
   cached?: boolean;
 }
 
-interface UmbraPoolResponse {
-  label?: string;
-  address?: string;
-  snapshot?: {
-    totalUsdValue?: number;
-    primaryHolding?: {
-      amount?: number;
-      usdValue?: number;
-      symbol?: string;
-    };
-  };
+/** Last successful Umbra on-chain read (per isolate) */
+let umbraLastGood: {
+  at: number;
+  value: { pools: Pool[]; tvl: number; stats: string };
+} | null = null;
+const UMBRA_LAST_GOOD_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+function fmtCompactUsd(n: number): string {
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+  if (n >= 1e3) return `$${Math.round(n / 1e3)}k`;
+  return `$${Math.round(n)}`;
 }
 
-async function fetchUmbra(): Promise<{ pools: Pool[]; tvl: number }> {
-  const res = await fetch(UMBRA_POOLS_URL, {
-    signal: AbortSignal.timeout(7000),
-    headers: { Accept: 'application/json' },
-  });
-  if (!res.ok) throw new Error(`Umbra pools HTTP ${res.status}`);
-  const data = await res.json();
-
-  const rawPools: UmbraPoolResponse[] = data?.pools || [];
-  const mapped = rawPools
-    .map((p) => {
-      const asset = p.label || p.snapshot?.primaryHolding?.symbol || 'UNKNOWN';
-      const usd =
-        p.snapshot?.totalUsdValue ?? p.snapshot?.primaryHolding?.usdValue ?? 0;
-      const balance = p.snapshot?.primaryHolding?.amount ?? 0;
-      return {
-        asset,
-        address: p.address || null,
-        balance: Number(balance) || 0,
-        usd: Number(usd) || 0,
-      } satisfies Pool;
-    })
-    .filter((p) => p.usd > 0 || p.balance > 0)
-    .sort((a, b) => b.usd - a.usd);
-
-  const preferred = new Set<string>(
-    UMBRA_DISPLAY_ASSETS as unknown as string[]
-  );
-  const display: Pool[] = [];
-  let otherUsd = 0;
-  let otherBal = 0;
-
-  for (const p of mapped) {
-    if (preferred.has(p.asset)) display.push(p);
-    else {
-      otherUsd += p.usd;
-      otherBal += p.balance;
+/**
+ * Umbra TVL from chain state (V1 pools + V2 vaults; see ./umbra.ts).
+ * Never resolves to a silent $0: on failure it serves the last good read,
+ * then DefiLlama's Umbra TVL, and otherwise rejects so the row is flagged.
+ */
+async function fetchUmbra(): Promise<{
+  pools: Pool[];
+  tvl: number;
+  stats: string;
+  stale?: boolean;
+}> {
+  try {
+    const r = await Promise.race([
+      fetchUmbraOnchain(RPC_URLS),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Umbra on-chain timeout')), 6500)
+      ),
+    ]);
+    const parts = ['V1 + V2 shielded pools · on-chain'];
+    if (r.umbraTokenUsd >= 1) {
+      parts.push(`excl. ${fmtCompactUsd(r.umbraTokenUsd)} UMBRA deposits`);
     }
+    const value = { pools: r.pools, tvl: r.tvl, stats: parts.join(' · ') };
+    umbraLastGood = { at: Date.now(), value };
+    return value;
+  } catch (err) {
+    console.error('Umbra on-chain read failed:', err);
+    if (
+      umbraLastGood &&
+      Date.now() - umbraLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
+    ) {
+      const asOf = new Date(umbraLastGood.at).toISOString().slice(11, 16);
+      return {
+        ...umbraLastGood.value,
+        stats: `${umbraLastGood.value.stats} · stale (last read ${asOf} UTC)`,
+        stale: true,
+      };
+    }
+    const tvl = await fetchUmbraFromLlama();
+    return {
+      pools: [],
+      tvl,
+      stats: 'On-chain read failed · showing DefiLlama Umbra TVL',
+      stale: true,
+    };
   }
-
-  display.sort((a, b) => {
-    const ia = UMBRA_DISPLAY_ASSETS.indexOf(
-      a.asset as (typeof UMBRA_DISPLAY_ASSETS)[number]
-    );
-    const ib = UMBRA_DISPLAY_ASSETS.indexOf(
-      b.asset as (typeof UMBRA_DISPLAY_ASSETS)[number]
-    );
-    if (ia === -1 && ib === -1) return b.usd - a.usd;
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
-
-  if (otherUsd >= 1) {
-    display.push({
-      asset: 'OTHER',
-      address: null,
-      balance: otherBal,
-      usd: otherUsd,
-    });
-  }
-
-  const tvl =
-    typeof data?.totals?.usd === 'number'
-      ? data.totals.usd
-      : mapped.reduce((s, p) => s + p.usd, 0);
-
-  return { pools: display, tvl };
 }
 
 async function fetchJson(url: string, ms: number) {
@@ -473,11 +444,18 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
 
   let umbraPools: Pool[] = [];
   let umbraTvl = 0;
+  let umbraStats: string | undefined;
+  let umbraStale = false;
+  let umbraError: string | undefined;
   if (umbraResult.status === 'fulfilled') {
     umbraPools = umbraResult.value.pools;
     umbraTvl = umbraResult.value.tvl;
+    umbraStats = umbraResult.value.stats;
+    umbraStale = !!umbraResult.value.stale;
   } else {
     console.error('Umbra fetch error:', umbraResult.reason);
+    umbraError = 'Umbra TVL unavailable (upstream read failed)';
+    umbraStats = 'Data temporarily unavailable — TVL not shown';
   }
 
   const stakedArx =
@@ -569,6 +547,9 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       kind: 'pool',
       pools: umbraPools,
       tvl: umbraTvl,
+      stats: umbraStats,
+      ...(umbraStale ? { stale: true } : {}),
+      ...(umbraError ? { error: umbraError } : {}),
     },
     {
       name: 'Arcium',
