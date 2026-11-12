@@ -1,15 +1,13 @@
 /**
- * Umbra Privacy TVL — read directly from Solana chain state.
+ * Umbra Privacy V1 TVL — read directly from Solana chain state.
  *
- * Replaces ownership.umbraprivacy.com/api/pools, which started returning
- * Vercel 404 DEPLOYMENT_NOT_FOUND on 2026-10-23 (AEDT) and silently zeroed
- * Umbra on the dashboard.
+ * This is the original Arcium-MPC shielded pool (program UMBRAD2…).
+ * Umbra v2 deposits live in the Nimbus shielded pool and are reported
+ * on the Nimbus row (see ./nimbus.ts) so the two are not double-counted.
  *
- * Mirrors the DefiLlama adapters (projects/umbra-privacy, umbra-privacy-v2):
- *  - V1: every pool account of the Umbra program owns one SPL token account
- *    holding that pool's deposits.
- *  - V2: one vault authority owns every SPL deposit; native SOL sits as
- *    lamports in one program-owned vault.
+ * Mirrors the DefiLlama adapter projects/umbra-privacy-v1:
+ *  - every V1 pool account of the Umbra program owns one SPL token
+ *    account holding that pool's deposits.
  *  - UMBRA (the protocol's own token) is reported separately, not in TVL,
  *    same as DefiLlama's "staking" bucket.
  * Prices + symbols come from coins.llama.fi (no key, covers long-tail mints).
@@ -40,8 +38,6 @@ const UMBRA_V1_POOLS_FALLBACK = [
   'Gsy9tFoDz5BpFwXGVqS9c33DFoB5DRbQ34uFDyNTSH5J',
   'H8ZdSFxFp9ixvEmn2asiva5bPujpx1Q3EtsYwxmqNxVK',
 ];
-export const UMBRA_V2_TOKEN_VAULT = '2sjnjABJHPEZS8oVdp8nztPBUVUAT7uJawc8eQTMHTfa';
-export const UMBRA_V2_SOL_VAULT = 'BxDCkvgZYRcCAnpywVw5j14AhkXehYvsXoCRiaodUs8s';
 export const UMBRA_MINT = 'PRVT6TB7uss3FrUd2D9xs2zqDBsa3GbMJMwCQsgmeta';
 
 const SOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -59,8 +55,6 @@ export interface UmbraResult {
   tvl: number;
   /** USD value of UMBRA tokens deposited (DefiLlama "staking") */
   umbraTokenUsd: number;
-  v1Usd: number;
-  v2Usd: number;
   /** count of mints we could not price (excluded from TVL) */
   unpriced: number;
 }
@@ -199,7 +193,7 @@ export async function fetchUmbraOnchain(
   solPrice?: number
 ): Promise<UmbraResult> {
   const v1Pools = await getV1PoolAccounts(rpcUrls);
-  const owners = [...v1Pools, UMBRA_V2_TOKEN_VAULT];
+  const owners = v1Pools;
 
   const reqs: RpcRequest[] = [];
   for (const owner of owners) {
@@ -210,26 +204,14 @@ export async function fetchUmbraOnchain(
       });
     }
   }
-  reqs.push({ method: 'getBalance', params: [UMBRA_V2_SOL_VAULT] });
   const results = await rpcBatch(rpcUrls, reqs);
 
-  const tagged: Array<Holding & { v: 1 | 2 }> = [];
+  const tagged: Holding[] = [];
   owners.forEach((owner, i) => {
-    const v = owner === UMBRA_V2_TOKEN_VAULT ? 2 : 1;
     for (const r of [results[i * 2], results[i * 2 + 1]]) {
-      for (const h of parseHoldings(r, owner)) tagged.push({ ...h, v });
+      for (const h of parseHoldings(r, owner)) tagged.push(h);
     }
   });
-  const lamports = Number(results[results.length - 1]?.value);
-  if (!Number.isFinite(lamports)) throw new Error('Umbra V2 SOL vault read failed');
-  if (lamports > 0) {
-    tagged.push({
-      mint: SOL_MINT,
-      amount: lamports / 1e9,
-      address: UMBRA_V2_SOL_VAULT,
-      v: 2,
-    });
-  }
 
   const prices = await getLlamaPrices(tagged.map((h) => h.mint));
   if (solPrice && solPrice > 0) {
@@ -237,8 +219,6 @@ export async function fetchUmbraOnchain(
   }
 
   let tvl = 0;
-  let v1Usd = 0;
-  let v2Usd = 0;
   let umbraTokenUsd = 0;
   const unpricedMints = new Set<string>();
   const bySymbol = new Map<string, Pool>();
@@ -255,8 +235,6 @@ export async function fetchUmbraOnchain(
       continue;
     }
     tvl += usd;
-    if (h.v === 1) v1Usd += usd;
-    else v2Usd += usd;
 
     const upper = p.symbol.toUpperCase();
     const symbol = upper === 'WSOL' ? 'SOL' : upper;
@@ -294,25 +272,23 @@ export async function fetchUmbraOnchain(
     pools,
     tvl,
     umbraTokenUsd,
-    v1Usd,
-    v2Usd,
     unpriced: unpricedMints.size,
   };
 }
 
 /**
- * Fallback only: DefiLlama's own Umbra V1 + V2 Solana TVL (excl. staking).
+ * Fallback only: DefiLlama Umbra Privacy V1 Solana TVL (excl. staking).
  * Used when our on-chain read fails, so the row never silently drops to $0.
+ * V2 is reported on the Nimbus row and must not be included here.
  */
 export async function fetchUmbraFromLlama(): Promise<number> {
-  // Parent slug = Umbra V1 + V2 combined (excl. UMBRA staking)
-  const res = await fetch('https://api.llama.fi/tvl/umbra-privacy', {
+  const res = await fetch('https://api.llama.fi/tvl/umbra-privacy-v1', {
     signal: AbortSignal.timeout(4000),
   });
-  if (!res.ok) throw new Error(`llama tvl umbra-privacy HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`llama tvl umbra-privacy-v1 HTTP ${res.status}`);
   const total = Number(await res.text());
   if (!Number.isFinite(total) || !(total > 0)) {
-    throw new Error('llama Umbra TVL unavailable');
+    throw new Error('llama Umbra V1 TVL unavailable');
   }
   return total;
 }
