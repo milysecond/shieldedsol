@@ -40,14 +40,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url,
       siteName: SITE_NAME,
       type: 'website',
-      images: [{ url: `${SITE_URL}/api/og?v=20260820c`, width: 1200, height: 630 }],
+      images: [{ url: `${SITE_URL}/api/og?v=20261112a`, width: 1200, height: 630 }],
     },
     twitter: {
       card: 'summary_large_image',
       site: '@shieldedsol',
       title: `${name} | ${SITE_NAME}`,
       description,
-      images: [`${SITE_URL}/api/og?v=20260820c`],
+      images: [`${SITE_URL}/api/og?v=20261112a`],
     },
   };
 }

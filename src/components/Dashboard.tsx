@@ -108,6 +108,14 @@ function usdToSol(usd: number | null | undefined, solPrice: number): number | nu
   return usd / solPrice;
 }
 
+/** True SOL balances only — never invent SOL from ARX/USDC USD */
+function nativeSolBalance(p: { pools?: Pool[] }): number {
+  const pools = Array.isArray(p.pools) ? p.pools : [];
+  return pools
+    .filter((x) => String(x.asset || '').toUpperCase() === 'SOL')
+    .reduce((s, x) => s + (Number(x.balance) || 0), 0);
+}
+
 function fmtSol(n: number | null | undefined): string {
   if (n == null || isNaN(n)) return '--';
   if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
@@ -711,7 +719,10 @@ export default function Dashboard({
     },
     [unit, solPrice]
   );
-  const heroTotalSol = data ? usdToSol(data.totalTvl, solPrice) : null;
+  const heroTotalSol = useMemo(() => {
+    const total = poolProtocols.reduce((s, p) => s + nativeSolBalance(p), 0);
+    return total > 0 ? total : null;
+  }, [poolProtocols]);
 
   const placeholders = [
     'Privacy Cash',
