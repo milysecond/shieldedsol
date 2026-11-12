@@ -131,3 +131,81 @@ export function adminNewSubscriberEmail(email: string): {
   const text = `New Shielded Sol subscriber: ${email}\n${SITE_URL}`;
   return { subject, html, text };
 }
+
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function row(label: string, value: string): string {
+  const body = value.trim()
+    ? escapeHtml(value).replace(/\n/g, '<br />')
+    : '<span style="color:#525252;">—</span>';
+  return `<tr>
+    <td style="padding:8px 0;vertical-align:top;width:148px;font-family:JetBrains Mono,ui-monospace,monospace;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:${MUTED};">
+      ${escapeHtml(label)}
+    </td>
+    <td style="padding:8px 0;font-family:Inter,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:${TEXT};word-break:break-word;">
+      ${body}
+    </td>
+  </tr>`;
+}
+
+export function addProtocolSubmissionEmail(fields: {
+  name: string;
+  website: string;
+  xHandle: string;
+  description: string;
+  privacyMethodLabel: string;
+  programIds: string;
+  dataSource: string;
+  contactName: string;
+  contactEmail: string;
+  notes: string;
+}): { subject: string; html: string; text: string } {
+  const subject = `New protocol submission: ${fields.name}`;
+  const xLine = fields.xHandle ? `@${fields.xHandle}` : '';
+  const html = baseLayout({
+    preheader: `New add-protocol submission: ${fields.name}`,
+    title: subject,
+    bodyHtml: `
+      <p style="margin:0 0 18px;">Someone submitted a protocol to add on ${SITE_NAME}.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        ${row('Protocol', fields.name)}
+        ${row('Website', fields.website)}
+        ${row('X handle', xLine)}
+        ${row('Description', fields.description)}
+        ${row('Privacy method', fields.privacyMethodLabel)}
+        ${row('Program IDs', fields.programIds)}
+        ${row('TVL / data source', fields.dataSource)}
+        ${row('Contact name', fields.contactName)}
+        ${row('Contact email', fields.contactEmail)}
+        ${row('Anything else', fields.notes)}
+      </table>
+    `,
+    ctaLabel: 'Open dashboard',
+    ctaHref: SITE_URL,
+  });
+  const text = [
+    `New protocol submission on ${SITE_NAME}`,
+    '',
+    `Protocol: ${fields.name}`,
+    `Website: ${fields.website || '—'}`,
+    `X handle: ${xLine || '—'}`,
+    `Description: ${fields.description || '—'}`,
+    `Privacy method: ${fields.privacyMethodLabel}`,
+    `Program IDs: ${fields.programIds || '—'}`,
+    `TVL / data source: ${fields.dataSource || '—'}`,
+    `Contact name: ${fields.contactName || '—'}`,
+    `Contact email: ${fields.contactEmail}`,
+    `Anything else: ${fields.notes || '—'}`,
+    '',
+    SITE_URL,
+  ].join('\n');
+  return { subject, html, text };
+}
