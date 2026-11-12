@@ -16,7 +16,7 @@ async function apiGet(path, query) {
   const res = await fetch(url.toString(), {
     headers: {
       Accept: "application/json",
-      "User-Agent": "shieldedsol-mcp/1.0"
+      "User-Agent": "shieldedsol-mcp/1.1"
     }
   });
   const body = await res.json().catch(() => ({}));
@@ -34,19 +34,19 @@ function text(data) {
 }
 var server = new McpServer({
   name: "shieldedsol",
-  version: "1.0.0"
+  version: "1.1.0"
 });
 server.registerTool(
   "list_protocols",
   {
-    description: "List Solana privacy protocols with live TVL (USD), pools, and status from Shielded Sol."
+    description: "List Solana privacy protocols with live TVL (USD), pools, status, and (where measured, e.g. Helius Rings) public deposit/withdraw volumes + tx counts from Shielded Sol."
   },
   async () => text(await apiGet("/api/v1/protocols"))
 );
 server.registerTool(
   "get_protocol",
   {
-    description: "Get one protocol by name or slug (e.g. magicblock, privacy-cash, Umbra).",
+    description: "Get one protocol by name or slug (e.g. magicblock, privacy-cash, Umbra, helius-rings). Includes `flows` (public deposit/withdraw volumes, tx counts) when measured.",
     inputSchema: {
       id: z.string().describe("Protocol name or slug")
     }

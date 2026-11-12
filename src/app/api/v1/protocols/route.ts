@@ -23,6 +23,8 @@ export async function GET() {
         balance: pool.balance,
         usd: pool.usd,
       })),
+      // Public deposit/withdraw volumes + tx counts (null where not measured)
+      flows: p.flows ?? null,
     }));
 
     return jsonOk({

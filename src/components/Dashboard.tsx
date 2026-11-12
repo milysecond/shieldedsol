@@ -32,6 +32,17 @@ interface Protocol {
   /** Live data unavailable — tvl is not a real reading */
   error?: string;
   stale?: boolean;
+  /** Public deposit/withdraw flows (e.g. Helius Rings) */
+  flows?: {
+    status: 'complete' | 'indexing' | 'unavailable';
+    since: string | null;
+    depositVolumeUsd: number | null;
+    withdrawVolumeUsd: number | null;
+    txCount: number | null;
+    depositTxCount: number | null;
+    withdrawTxCount: number | null;
+    note?: string;
+  };
 }
 interface ProtocolsResponse {
   solPrice: number;
@@ -1111,6 +1122,23 @@ export default function Dashboard({
                 {isOpen && !isPlaceholder && protocol && (
                   <div className="proto-details">
                     {stats && <div className="proto-stats">{stats}</div>}
+                    {protocol.flows?.status === 'complete' && (
+                      <div className="proto-stats">
+                        Public flows
+                        {protocol.flows.since
+                          ? ` since ${protocol.flows.since.slice(0, 10)}`
+                          : ''}
+                        : {fmtValue(protocol.flows.depositVolumeUsd)} deposited
+                        · {fmtValue(protocol.flows.withdrawVolumeUsd)} withdrawn
+                        · {protocol.flows.txCount?.toLocaleString()} txs
+                      </div>
+                    )}
+                    {protocol.flows?.status === 'indexing' && (
+                      <div className="proto-stats">
+                        Public deposit/withdraw volumes: indexing on-chain
+                        history…
+                      </div>
+                    )}
                     {pools.length > 0 && (
                       <div className="proto-pools">
                         {pools.map((pool) => (

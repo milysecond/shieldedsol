@@ -15,8 +15,8 @@ shieldedsol-mcp
 
 | Tool | Description |
 |------|-------------|
-| `list_protocols` | Live TVL for all protocols |
-| `get_protocol` | One protocol by slug/name |
+| `list_protocols` | Live TVL for all protocols (+ public flows where measured) |
+| `get_protocol` | One protocol by slug/name, e.g. `helius-rings` (TVL, pools, `flows`: deposit/withdraw volume + tx counts) |
 | `tvl_history` | Aggregate history (`range`) |
 | `protocol_history` | Per-protocol history |
 | `health` | API + Turso status |

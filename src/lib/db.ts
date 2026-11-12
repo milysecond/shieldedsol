@@ -176,6 +176,59 @@ export async function saveTokenPrice(
   );
 }
 
+/* ---- Helius Rings public flow index (single-row cursor + totals) ---- */
+
+const RINGS_FLOW_TABLE_SQL = `CREATE TABLE IF NOT EXISTS helius_rings_flow_index (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  state TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)`;
+
+export async function getRingsFlowState(): Promise<{
+  state: string | null;
+  version: number;
+} | null> {
+  if (!hasTurso()) return null;
+  const results = await executePipeline([
+    { sql: RINGS_FLOW_TABLE_SQL },
+    { sql: 'SELECT state, version FROM helius_rings_flow_index WHERE id = 1' },
+  ]);
+  const row = results[1]?.[0];
+  if (!row) return { state: null, version: 0 };
+  return {
+    state: (row.state as string) || null,
+    version: Number(row.version) || 0,
+  };
+}
+
+/**
+ * Optimistic write: only replaces the row if nobody else advanced it since
+ * we read `prevVersion` (two isolates syncing at once can't double-count).
+ */
+export async function saveRingsFlowState(
+  state: string,
+  prevVersion: number
+): Promise<boolean> {
+  if (!hasTurso()) return false;
+  const now = new Date().toISOString();
+  const results = await executePipeline([
+    { sql: RINGS_FLOW_TABLE_SQL },
+    prevVersion === 0
+      ? {
+          sql: 'INSERT OR IGNORE INTO helius_rings_flow_index (id, state, version, updated_at) VALUES (1, ?, 1, ?)',
+          args: [state, now],
+        }
+      : {
+          sql: 'UPDATE helius_rings_flow_index SET state = ?, version = version + 1, updated_at = ? WHERE id = 1 AND version = ?',
+          args: [state, now, prevVersion],
+        },
+    { sql: 'SELECT state, version FROM helius_rings_flow_index WHERE id = 1' },
+  ]);
+  const row = results[2]?.[0];
+  return !!row && row.state === state && Number(row.version) === prevVersion + 1;
+}
+
 // Read operations
 export async function getTvlHistory(
   protocolName: string,

@@ -19,6 +19,12 @@ Base: `https://www.shieldedsol.com` · CORS open · no API key
 
 Legacy: `GET /api/protocols` still works for the dashboard.
 
+Each protocol carries `flows` (or `null`): all-time public deposit / withdraw
+volume (USD at current prices) and tx counts measured from on-chain vault
+balance deltas. Currently populated for Helius Privacy Rings
+(`/api/v1/protocols/helius-rings`); see `src/lib/helius-rings.ts` for method.
+Private (encrypted) balances are never read.
+
 ## TypeScript SDK
 
 ```bash

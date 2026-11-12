@@ -37,3 +37,13 @@ CREATE TABLE IF NOT EXISTS token_prices (
 
 -- Index for efficient price queries
 CREATE INDEX IF NOT EXISTS idx_price_symbol_timestamp ON token_prices(symbol, timestamp);
+
+-- Helius Privacy Rings public flow index: one row holding the signature
+-- cursor + raw per-mint deposit/withdraw totals (see src/lib/helius-rings.ts).
+-- Also created lazily by the app (CREATE TABLE IF NOT EXISTS).
+CREATE TABLE IF NOT EXISTS helius_rings_flow_index (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  state TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+);

@@ -1,6 +1,6 @@
 {
   "name": "@shieldedsol/sdk",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "TypeScript SDK for the Shielded Sol privacy TVL API",
   "type": "module",
   "main": "./dist/index.cjs",
