@@ -7,6 +7,8 @@ import MadeByMilysec from './MadeByMilysec';
 import BeamShell from './BeamShell';
 import BrandMark from './BrandMark';
 import { PROTOCOL_X_HANDLES, SITE_URL, programWatchUrl, solAddressUrl } from '@/lib/constants';
+import { prepareTvlSeries, seriesChange } from '@/lib/tvl-chart';
+import TvlHistoryChart from './TvlHistoryChart';
 import {
   matchProtocolName,
   protocolDeepLink,
@@ -647,36 +649,19 @@ export default function Dashboard({
 
   const protocols = data?.protocols || [];
 
+  const chartSeries = useMemo(
+    () => prepareTvlSeries(chartHistory, chartPeriod, data?.totalTvl),
+    [chartHistory, chartPeriod, data?.totalTvl]
+  );
+
   let tvlChangeText = '';
   let tvlChangeClass = '';
-  if (data && chartHistory.length >= 2) {
-    const current = data.totalTvl;
-    const previous = chartHistory[0]?.totalTvl || 0;
-    if (previous > 0) {
-      const change = ((current - previous) / previous) * 100;
-      const arrow = change >= 0 ? '\u2191' : '\u2193';
-      tvlChangeText = `${arrow} ${Math.abs(change).toFixed(2)}% (${chartPeriod}D)`;
-      tvlChangeClass = change >= 0 ? 'up' : 'down';
-    }
+  const change = seriesChange(chartSeries);
+  if (change && change.pct != null) {
+    const arrow = change.pct >= 0 ? '\u2191' : '\u2193';
+    tvlChangeText = `${arrow} ${Math.abs(change.pct).toFixed(2)}% (${chartPeriod}D)`;
+    tvlChangeClass = change.pct >= 0 ? 'up' : 'down';
   }
-
-  const chartMax =
-    chartHistory.length > 0
-      ? Math.max(...chartHistory.map((d) => d.totalTvl))
-      : 0;
-  const chartStartLabel =
-    chartHistory.length > 0
-      ? new Date(chartHistory[0].timestamp).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        })
-      : '--';
-  const chartEndLabel =
-    chartHistory.length > 0
-      ? new Date(
-          chartHistory[chartHistory.length - 1].timestamp
-        ).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      : '--';
 
   const updatedLabel = useMemo(() => {
     if (!data?.updatedAt) return '--';
@@ -1372,39 +1357,29 @@ export default function Dashboard({
               ))}
             </div>
           </div>
-          <div className="chart-container">
-                      {chartHistory.length > 0
-                        ? chartHistory.map((point, i) => {
-                            const h =
-                              chartMax > 0 ? (point.totalTvl / chartMax) * 100 : 0;
-                            return (
-                              <div
-                                key={i}
-                                className="chart-bar revealed"
-                                style={{ height: `${h}%`, animationDelay: `${i * 0.03}s` }}
-                                title={fmtValue(point.totalTvl)}
-                              />
-                            );
-                          })
-                        : loading
-                          ? (
-                              <div className="chart-loading">
-                                <LoadOrb
-                                  state="working"
-                                  size={64}
-                                  theme={lightMode ? 'light' : 'dark'}
-                                  label="Loading TVL history"
-                                />
-                              </div>
-                            )
-                          : (
-                              <div className="empty-note">No history yet</div>
-                            )}
-                    </div>
-          <div className="chart-labels">
-            <span className="chart-label">{chartStartLabel}</span>
-            <span className="chart-label">{chartEndLabel}</span>
-          </div>
+          {chartHistory.length > 0 ? (
+            <TvlHistoryChart
+              points={chartHistory}
+              rangeDays={chartPeriod}
+              currentTvl={data?.totalTvl}
+              unit={unit}
+              solPrice={solPrice}
+              formatValue={(v) => (unit === 'sol' ? fmtSol(v) : fmtUsd(v))}
+            />
+          ) : loading ? (
+            <div className="chart-container chart-container--loading">
+              <div className="chart-loading">
+                <LoadOrb
+                  state="working"
+                  size={64}
+                  theme={lightMode ? 'light' : 'dark'}
+                  label="Loading TVL history"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="empty-note">No history yet</div>
+          )}
         </div>
 
         <div className="follow-row">

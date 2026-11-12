@@ -1463,6 +1463,10 @@ h1 {
   height: 60px;
   position: relative;
 }
+.chart-container--loading {
+  height: 200px;
+  justify-content: center;
+}
 .chart-loading {
   width: 100%;
   height: 100%;
@@ -1487,6 +1491,86 @@ h1 {
 .chart-label {
   color: var(--text4);
   font-size: 0.5rem;
+}
+
+.tvl-chart {
+  width: 100%;
+}
+.tvl-chart-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0.15rem 0 0.45rem;
+  min-height: 1.25rem;
+}
+.tvl-chart-current {
+  font-size: 0.95rem;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.tvl-chart-stats .tvl-change {
+  margin-top: 0;
+  font-size: 0.75rem;
+}
+.tvl-chart-empty,
+.tvl-chart-placeholder {
+  color: var(--text4);
+  font-size: 0.7rem;
+  padding: 2rem 0;
+  text-align: center;
+}
+.tvl-chart-plot {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 640 / 200;
+}
+.tvl-chart-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+.tvl-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.tvl-chart-ylabel,
+.tvl-chart-xlabel {
+  fill: var(--text4);
+  font-size: 10px;
+  font-family: inherit;
+}
+.tvl-chart-crosshair line {
+  stroke: var(--text4);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  vector-effect: non-scaling-stroke;
+}
+.tvl-chart-tooltip {
+  position: absolute;
+  top: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.35rem 0.55rem;
+  white-space: nowrap;
+  z-index: 2;
+  box-shadow: 0 4px 16px color-mix(in srgb, #000 40%, transparent);
+}
+.tvl-chart-tip-date {
+  color: var(--text4);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+}
+.tvl-chart-tip-val {
+  color: var(--text);
+  font-size: 0.78rem;
+  margin-top: 0.1rem;
 }
 
 /* Protocol charts */
@@ -2115,6 +2199,10 @@ footer a:hover {
 
   .chart-container {
     height: 72px;
+  }
+
+  .chart-container--loading {
+    height: 160px;
   }
 
   .follow-row {
