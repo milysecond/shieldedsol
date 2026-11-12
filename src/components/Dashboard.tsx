@@ -1529,13 +1529,7 @@ export default function Dashboard({
           <a href="/lookout">lookout</a>
           <a href="/brand">brand</a>
           <a href="/developers">developers</a>
-          <a
-            href="https://t.me/metasal"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            + add protocol
-          </a>
+          <a href="/add">+ add protocol</a>
           <MadeByMilysec height={26} />
         </div>
       </footer>

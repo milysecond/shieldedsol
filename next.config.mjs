@@ -9,6 +9,7 @@ const nextConfig = {
     return [
       { source: '/p/nimbus', destination: '/p/umbra', permanent: true },
       { source: '/p/nimbus/', destination: '/p/umbra', permanent: true },
+      { source: '/add-protocol', destination: '/add', permanent: true },
     ];
   },
 };

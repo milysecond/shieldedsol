@@ -49,6 +49,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.65,
     })),
     {
+      url: `${SITE_URL}/add`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
       url: `${SITE_URL}/developers`,
       lastModified: now,
       changeFrequency: 'weekly',
