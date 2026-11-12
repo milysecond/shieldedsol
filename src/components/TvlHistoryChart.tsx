@@ -25,7 +25,7 @@ type Props = {
 };
 
 const VB = { w: 640, h: 200 };
-const PAD = { l: 46, r: 10, t: 12, b: 28 };
+const PAD = { l: 46, r: 14, t: 12, b: 28 };
 
 export default function TvlHistoryChart({
   points,
@@ -178,13 +178,15 @@ export default function TvlHistoryChart({
               vectorEffect="non-scaling-stroke"
             />
 
-            {layout.xLabels.map((p) => (
+            {layout.xLabels.map((p, i, arr) => (
               <text
                 key={p.t}
                 className="tvl-chart-xlabel"
                 x={layout.xAt(p.t)}
                 y={VB.h - 8}
-                textAnchor="middle"
+                textAnchor={
+                  i === 0 ? "start" : i === arr.length - 1 ? "end" : "middle"
+                }
               >
                 {formatChartDate(p.t, rangeDays)}
               </text>
