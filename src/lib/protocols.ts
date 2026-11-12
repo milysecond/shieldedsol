@@ -7,8 +7,9 @@ import {
   PROTOCOL_PROGRAMS,
 } from './constants';
 import { fetchUmbraOnchain, fetchUmbraFromLlama } from './umbra';
+import { fetchHeliusRings } from './helius-rings';
 
-const RPC_URLS = [
+export const RPC_URLS = [
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL,
   SOLANA_RPC,
   'https://solana-rpc.publicnode.com',
@@ -103,6 +104,40 @@ export interface Pool {
   usd: number;
 }
 
+/**
+ * Public deposit / withdraw flows (currently Helius Rings only). Measured from
+ * public vault balance deltas — never from decrypted private state.
+ */
+export interface ProtocolFlows {
+  /** complete = all-time totals; indexing = backfill running, figures null */
+  status: 'complete' | 'indexing' | 'unavailable';
+  /** ISO time of the first indexed program tx */
+  since: string | null;
+  /** ISO time of the newest indexed program tx */
+  asOf: string | null;
+  depositVolumeUsd: number | null;
+  withdrawVolumeUsd: number | null;
+  /** successful program txs (deposits, withdrawals, private transfers, admin) */
+  txCount: number | null;
+  /** txs with a public inflow to a Ring vault */
+  depositTxCount: number | null;
+  /** txs with a public outflow from a Ring vault */
+  withdrawTxCount: number | null;
+  failedTxCount: number | null;
+  /** assets with flows that have no price (excluded from USD totals) */
+  unpricedAssets: number;
+  assets: {
+    asset: string;
+    mint: string;
+    deposited: number;
+    withdrawn: number;
+    depositedUsd: number | null;
+    withdrawnUsd: number | null;
+  }[];
+  method: string;
+  note?: string;
+}
+
 export interface Protocol {
   name: string;
   status: string;
@@ -120,6 +155,8 @@ export interface Protocol {
   error?: string;
   /** True when tvl is a last-good / fallback value rather than a fresh read */
   stale?: boolean;
+  /** Public deposit/withdraw volumes + tx counts, where measurable */
+  flows?: ProtocolFlows;
 }
 
 export interface ProtocolsResponse {
@@ -190,6 +227,51 @@ async function fetchUmbra(): Promise<{
       stats: 'On-chain read failed · showing DefiLlama Umbra TVL',
       stale: true,
     };
+  }
+}
+
+/** Last successful Helius Rings read (per isolate) */
+let ringsLastGood: {
+  at: number;
+  value: { pools: Pool[]; tvl: number; stats: string; flows: ProtocolFlows };
+} | null = null;
+
+/**
+ * Helius Rings TVL + public flows from chain state (see ./helius-rings.ts).
+ * On failure: last good read (6h, flagged stale), otherwise reject so the
+ * row is flagged with an error rather than showing a fake $0.
+ */
+async function fetchRings(): Promise<{
+  pools: Pool[];
+  tvl: number;
+  stats: string;
+  flows: ProtocolFlows;
+  stale?: boolean;
+}> {
+  try {
+    const r = await Promise.race([
+      fetchHeliusRings(RPC_URLS),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Helius Rings timeout')), 8000)
+      ),
+    ]);
+    const value = { pools: r.pools, tvl: r.tvl, stats: r.stats, flows: r.flows };
+    ringsLastGood = { at: Date.now(), value };
+    return value;
+  } catch (err) {
+    console.error('Helius Rings on-chain read failed:', err);
+    if (
+      ringsLastGood &&
+      Date.now() - ringsLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
+    ) {
+      const asOf = new Date(ringsLastGood.at).toISOString().slice(11, 16);
+      return {
+        ...ringsLastGood.value,
+        stats: `${ringsLastGood.value.stats} · stale (last read ${asOf} UTC)`,
+        stale: true,
+      };
+    }
+    throw err;
   }
 }
 
@@ -295,6 +377,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     magicblockSolResult,
     magicblockUsdcResult,
     voidifyResult,
+    ringsResult,
   ] = await Promise.allSettled([
     (async () => {
       const mintIds = [MINTS.SOL, MINTS.BONK, MINTS.ORE, MINTS.ARX, MINTS.ZEC].join(',');
@@ -366,6 +449,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       ]);
       return { classicSol, novaSol, novaUsdc };
     })(),
+    fetchRings(),
   ]);
 
   let solPrice = 180;
@@ -456,6 +540,25 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     console.error('Umbra fetch error:', umbraResult.reason);
     umbraError = 'Umbra TVL unavailable (upstream read failed)';
     umbraStats = 'Data temporarily unavailable — TVL not shown';
+  }
+
+  let ringsPools: Pool[] = [];
+  let ringsTvl = 0;
+  let ringsStats =
+    'Mainnet since 9 Nov 2026 · permissionless confidential Ring';
+  let ringsFlows: ProtocolFlows | undefined;
+  let ringsStale = false;
+  let ringsError: string | undefined;
+  if (ringsResult.status === 'fulfilled') {
+    ringsPools = ringsResult.value.pools;
+    ringsTvl = ringsResult.value.tvl;
+    ringsStats = ringsResult.value.stats;
+    ringsFlows = ringsResult.value.flows;
+    ringsStale = !!ringsResult.value.stale;
+  } else {
+    console.error('Helius Rings fetch error:', ringsResult.reason);
+    ringsError = 'Helius Rings TVL unavailable (on-chain read failed)';
+    ringsStats = `${ringsStats} · data temporarily unavailable — TVL not shown`;
   }
 
   const stakedArx =
@@ -586,14 +689,16 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     },
     {
       name: 'Helius Rings',
-      status: 'upcoming',
+      status: 'live',
       url: 'https://www.helius.dev/privacy',
       linkText: 'helius.dev/privacy',
       kind: 'pool',
-      pools: [],
-      tvl: 0,
-      stats:
-        'Private beta · confidential + anonymous rings · mainnet after audits',
+      pools: ringsPools,
+      tvl: ringsTvl,
+      stats: ringsStats,
+      ...(ringsFlows ? { flows: ringsFlows } : {}),
+      ...(ringsStale ? { stale: true } : {}),
+      ...(ringsError ? { error: ringsError } : {}),
     },
     {
       name: 'Light Protocol',

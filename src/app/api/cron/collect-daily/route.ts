@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchProtocolsData } from '@/lib/protocols';
+import { fetchProtocolsData, RPC_URLS } from '@/lib/protocols';
+import { syncHeliusRingsFlows } from '@/lib/helius-rings';
 import {
   saveTvlSnapshot,
   savePoolBalance,
@@ -18,6 +19,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Advance the Helius Rings public flow index with a bigger budget than
+    // the request path gets (backfill + new txs). Failure is non-fatal.
+    let ringsFlowTxs: number | null = null;
+    try {
+      const st = await syncHeliusRingsFlows(RPC_URLS, {
+        maxTx: 2000,
+        timeMs: 20_000,
+      });
+      ringsFlowTxs = st.txCount;
+    } catch (err) {
+      console.error('Helius Rings flow sync failed:', err);
+    }
+
     const data = await fetchProtocolsData();
     const timestamp = new Date().toISOString();
 
@@ -61,6 +75,7 @@ export async function POST(request: NextRequest) {
       success: true,
       timestamp,
       totalTvl: data.totalTvl,
+      heliusRingsFlowTxsIndexed: ringsFlowTxs,
       protocolCount: data.protocols.filter(
         (p) => p.status === 'live' && p.tvl > 0
       ).length,

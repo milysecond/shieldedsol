@@ -162,7 +162,7 @@ function parseHoldings(result: any, owner: string): Holding[] {
   return out;
 }
 
-async function getLlamaPrices(
+export async function getLlamaPrices(
   mints: string[]
 ): Promise<Record<string, { price: number; symbol: string }>> {
   const out: Record<string, { price: number; symbol: string }> = {};

@@ -77,8 +77,20 @@ export const MAGICBLOCK_URL = 'https://one.magicblock.app';
 export const MAGICBLOCK_PROGRAM =
   'SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2';
 
-/** Helius Rings product page (private beta; mainnet pending audits) */
+/** Helius Solana Privacy Rings — permissionless confidential Ring live on mainnet since 9 Nov 2026 */
 export const HELIUS_RINGS_URL = 'https://www.helius.dev/privacy';
+/** Shielded-pool program (helius-labs/privacy-rings) */
+export const HELIUS_RINGS_PROGRAM =
+  'ring1GaLCuJnkUMVkX2JeZLTTX17wKsV4fZmPVzXANW';
+/** User registry program */
+export const HELIUS_RINGS_USER_REGISTRY =
+  'regy3WAeRXMYuMYxr5iK3Bf9Arr3PcxGxyzAddbiqDQ';
+/** Native SOL custody PDA: [b"sol_interface", [0]] under the shielded pool */
+export const HELIUS_RINGS_SOL_INTERFACE =
+  'CiNmas621VuyofiDSrEPfTXHKrdZuB6jMKECyNiMpLXE';
+/** CPI-authority PDA [b"cpi_authority"]; token owner of every SPL interface vault */
+export const HELIUS_RINGS_CPI_AUTHORITY =
+  'CaM8DbtJ2mSecgaHYo9xeT7VSKq7AnaqEUm5p7e5LW4a';
 
 export const PROTOCOL_DEFINITIONS = [
   {
@@ -111,10 +123,11 @@ export const PROTOCOL_DEFINITIONS = [
   },
   {
     name: 'Helius Rings',
-    status: 'upcoming' as const,
+    status: 'live' as const,
     url: HELIUS_RINGS_URL,
     linkText: 'helius.dev/privacy',
-    pools: [] as string[],
+    // Dynamic: SOL interface + every SPL interface vault (see helius-rings.ts)
+    pools: ['SOL', 'ORE', 'USDC', 'OTHER'],
   },
   {
     name: 'Light Protocol',
@@ -221,6 +234,9 @@ export const PROTOCOL_PROGRAMS: Record<string, ProtocolProgram[]> = {
     { id: LIGHT_REGISTRY, label: 'Registry' },
     { id: LIGHT_COMPRESSED_TOKEN, label: 'cToken' },
   ],
+  'Helius Rings': [
+    { id: HELIUS_RINGS_PROGRAM, label: 'Shielded pool' },
+    { id: HELIUS_RINGS_USER_REGISTRY, label: 'User registry' },
+  ],
   // Turbine: zSOL mint tracked; no stable public program ID yet
-  // Helius Rings: private beta — no public mainnet program yet
 };

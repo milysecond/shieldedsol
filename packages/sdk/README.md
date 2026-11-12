@@ -21,6 +21,13 @@ console.log(live.totalTvlUsd, live.protocols.map((p) => p.name));
 const mb = await client.getProtocol('magicblock');
 console.log(mb.protocol.tvlUsd, mb.protocol.pools);
 
+// Helius Privacy Rings: public deposit/withdraw volumes + tx counts
+const rings = await client.getProtocol('helius-rings');
+const f = rings.protocol.flows; // null for protocols without flow data
+if (f?.status === 'complete') {
+  console.log(f.depositVolumeUsd, f.withdrawVolumeUsd, f.txCount);
+}
+
 const hist = await client.tvlHistory('30d');
 console.log(hist.dataPoints, hist.source);
 ```

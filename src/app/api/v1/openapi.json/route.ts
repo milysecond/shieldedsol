@@ -26,6 +26,8 @@ export async function GET() {
       '/api/v1/protocols': {
         get: {
           summary: 'Live TVL for all tracked protocols',
+          description:
+            'Each protocol has tvlUsd, pools, and `flows` (null unless measured). Helius Rings flows = all-time public deposit/withdraw volumes (USD at current prices) and tx counts from on-chain vault balance deltas; status "indexing" means the history backfill is still running and figures are null.',
           responses: { '200': { description: 'Protocol list + total TVL' } },
         },
       },
