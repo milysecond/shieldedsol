@@ -727,6 +727,8 @@ export default function Dashboard({
   const placeholders = [
     'Privacy Cash',
     'Umbra',
+    'Nimbus',
+    'Cloak',
     'Arcium',
     'MagicBlock',
     'Helius Rings',

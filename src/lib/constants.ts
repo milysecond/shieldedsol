@@ -25,8 +25,30 @@ export const ARCIUM_STAKING_PROGRAM =
 export const PRIVACY_CASH_PROGRAM =
   '9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD';
 
-/** Umbra privacy layer (pool owner program from ownership API) */
+/** Umbra privacy layer V1 (Arcium MPC pools) */
 export const UMBRA_PROGRAM = 'UMBRAD2ishebJTcgCLkTkNUx1v3GyoAgpTRPeWoLykh';
+
+/** Cloak shield-pool program (docs.cloak.ag) */
+export const CLOAK_PROGRAM = 'zh1eLd6rSphLejbFfJEneUwzHRfMKxgzrgkfwA6qRkW';
+/** Cloak SOL pool PDA ["pool", wSOL mint] */
+export const CLOAK_SOL_POOL = 'XJ63J8R5Bgb7eEg6UehcF96yLXUV5Sgs2fnhTHKuTH8';
+/** Cloak USDC vault authority PDA ["vault_authority", USDC mint] */
+export const CLOAK_USDC_VAULT_AUTHORITY =
+  'HS4QMJB2TKvRHMWhLrq6nV8SrEVezp4oUVozo3PaS6BY';
+/** Cloak USDT vault authority PDA ["vault_authority", USDT mint] */
+export const CLOAK_USDT_VAULT_AUTHORITY =
+  'BbgLH695kwN1UCzEdVnjS6Jk7vZNhpY8Ah7HHKkjjBz8';
+
+/** Nimbus shielded-pool program (docs.nimbusprivacy.xyz) — powers Umbra v2 */
+export const NIMBUS_SHIELDED_POOL =
+  'nimBUs55CbjkNfy8UvK48DqFTY7L2mdkmZMQC9mk6LK';
+export const NIMBUS_USER_REGISTRY =
+  'user69YjhU8d8noiQy9H3zsPnSiT38DK8qZfmrWSLjL';
+/** Nimbus VaultAuthority — owner of every SPL / Token-2022 pool ATA */
+export const NIMBUS_TOKEN_VAULT =
+  '2sjnjABJHPEZS8oVdp8nztPBUVUAT7uJawc8eQTMHTfa';
+/** Nimbus program-owned lamport vault */
+export const NIMBUS_SOL_VAULT = 'BxDCkvgZYRcCAnpywVw5j14AhkXehYvsXoCRiaodUs8s';
 
 /** Vanish Trade program (owner of tracked vault) */
 export const VANISH_PROGRAM = 'vanshF62ku4jVVdf8DS47SXuJC1rq8qokGSANAomhey';
@@ -104,8 +126,23 @@ export const PROTOCOL_DEFINITIONS = [
     status: 'live' as const,
     url: 'https://app.umbraprivacy.com',
     linkText: 'app.umbraprivacy.com',
-    // Dynamic pool list comes from ownership.umbraprivacy.com
+    // V1 Arcium pools; V2 deposits are listed under Nimbus
     pools: ['kmSOL', 'wSOL', 'USDC', 'USDT', 'UMBRA', 'ZINC', 'CASH', 'ARX', 'OTHER'],
+  },
+  {
+    name: 'Nimbus',
+    status: 'live' as const,
+    url: 'https://www.nimbusprivacy.xyz',
+    linkText: 'nimbusprivacy.xyz',
+    // Dynamic: VaultAuthority ATAs + lamport vault (see nimbus.ts)
+    pools: ['SOL', 'USDC', 'USDT', 'OTHER'],
+  },
+  {
+    name: 'Cloak',
+    status: 'live' as const,
+    url: 'https://cloak.ag',
+    linkText: 'cloak.ag',
+    pools: ['SOL', 'USDC', 'USDT'],
   },
   {
     name: 'Arcium',
@@ -181,6 +218,8 @@ export const DONATION_WALLET =
 export const PROTOCOL_X_HANDLES: Record<string, string> = {
   'Privacy Cash': 'theprivacycash',
   Umbra: 'UmbraPrivacy',
+  Nimbus: 'UmbraPrivacy',
+  Cloak: 'cloak_ag',
   Arcium: 'Arcium',
   MagicBlock: 'magicblock',
   'Helius Rings': 'Helius',
@@ -218,7 +257,12 @@ export const PROTOCOL_PROGRAMS: Record<string, ProtocolProgram[]> = {
   'Privacy Cash': [
     { id: PRIVACY_CASH_PROGRAM, label: 'Privacy Cash' },
   ],
-  Umbra: [{ id: UMBRA_PROGRAM, label: 'Umbra' }],
+  Umbra: [{ id: UMBRA_PROGRAM, label: 'Umbra V1' }],
+  Nimbus: [
+    { id: NIMBUS_SHIELDED_POOL, label: 'Shielded pool' },
+    { id: NIMBUS_USER_REGISTRY, label: 'User registry' },
+  ],
+  Cloak: [{ id: CLOAK_PROGRAM, label: 'Shield pool' }],
   Arcium: [{ id: ARCIUM_STAKING_PROGRAM, label: 'Arcium staking' }],
   MagicBlock: [{ id: MAGICBLOCK_PROGRAM, label: 'MagicBlock SPL' }],
   Voidify: [

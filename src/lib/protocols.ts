@@ -7,6 +7,8 @@ import {
   PROTOCOL_PROGRAMS,
 } from './constants';
 import { fetchUmbraOnchain, fetchUmbraFromLlama } from './umbra';
+import { fetchNimbusOnchain, fetchNimbusFromLlama } from './nimbus';
+import { fetchCloakOnchain } from './cloak';
 import { fetchHeliusRings } from './helius-rings';
 
 export const RPC_URLS = [
@@ -183,7 +185,8 @@ function fmtCompactUsd(n: number): string {
 }
 
 /**
- * Umbra TVL from chain state (V1 pools + V2 vaults; see ./umbra.ts).
+ * Umbra V1 TVL from chain state (Arcium MPC pools; see ./umbra.ts).
+ * V2 is reported separately as Nimbus.
  * Never resolves to a silent $0: on failure it serves the last good read,
  * then DefiLlama's Umbra TVL, and otherwise rejects so the row is flagged.
  */
@@ -200,7 +203,7 @@ async function fetchUmbra(): Promise<{
         setTimeout(() => reject(new Error('Umbra on-chain timeout')), 6500)
       ),
     ]);
-    const parts = ['V1 + V2 shielded pools · on-chain'];
+    const parts = ['V1 shielded pools · Arcium MPC · on-chain'];
     if (r.umbraTokenUsd >= 1) {
       parts.push(`excl. ${fmtCompactUsd(r.umbraTokenUsd)} UMBRA deposits`);
     }
@@ -224,9 +227,110 @@ async function fetchUmbra(): Promise<{
     return {
       pools: [],
       tvl,
-      stats: 'On-chain read failed · showing DefiLlama Umbra TVL',
+      stats: 'On-chain read failed · showing DefiLlama Umbra V1 TVL',
       stale: true,
     };
+  }
+}
+
+/** Last successful Nimbus on-chain read (per isolate) */
+let nimbusLastGood: {
+  at: number;
+  value: { pools: Pool[]; tvl: number; stats: string };
+} | null = null;
+
+/**
+ * Nimbus TVL from chain state (Umbra v2 vaults; see ./nimbus.ts).
+ * Never resolves to a silent $0: on failure it serves the last good read,
+ * then DefiLlama's Umbra Privacy V2 Solana TVL, and otherwise rejects.
+ */
+async function fetchNimbus(): Promise<{
+  pools: Pool[];
+  tvl: number;
+  stats: string;
+  stale?: boolean;
+}> {
+  try {
+    const r = await Promise.race([
+      fetchNimbusOnchain(RPC_URLS),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Nimbus on-chain timeout')), 6500)
+      ),
+    ]);
+    const parts = ['ZK shielded pool · powers Umbra v2 · on-chain'];
+    if (r.umbraTokenUsd >= 1) {
+      parts.push(`excl. ${fmtCompactUsd(r.umbraTokenUsd)} UMBRA deposits`);
+    }
+    const value = { pools: r.pools, tvl: r.tvl, stats: parts.join(' · ') };
+    nimbusLastGood = { at: Date.now(), value };
+    return value;
+  } catch (err) {
+    console.error('Nimbus on-chain read failed:', err);
+    if (
+      nimbusLastGood &&
+      Date.now() - nimbusLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
+    ) {
+      const asOf = new Date(nimbusLastGood.at).toISOString().slice(11, 16);
+      return {
+        ...nimbusLastGood.value,
+        stats: `${nimbusLastGood.value.stats} · stale (last read ${asOf} UTC)`,
+        stale: true,
+      };
+    }
+    const tvl = await fetchNimbusFromLlama();
+    return {
+      pools: [],
+      tvl,
+      stats: 'On-chain read failed · showing DefiLlama Umbra V2 (Solana) TVL',
+      stale: true,
+    };
+  }
+}
+
+/** Last successful Cloak on-chain read (per isolate) */
+let cloakLastGood: {
+  at: number;
+  value: { pools: Pool[]; tvl: number; stats: string };
+} | null = null;
+
+/**
+ * Cloak TVL from chain state (see ./cloak.ts). Not listed on DefiLlama,
+ * so a failed read is flagged rather than shown as $0.
+ */
+async function fetchCloak(): Promise<{
+  pools: Pool[];
+  tvl: number;
+  stats: string;
+  stale?: boolean;
+}> {
+  try {
+    const r = await Promise.race([
+      fetchCloakOnchain(RPC_URLS),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Cloak on-chain timeout')), 6500)
+      ),
+    ]);
+    const value = {
+      pools: r.pools,
+      tvl: r.tvl,
+      stats: 'ZK UTXO shielded pools · on-chain',
+    };
+    cloakLastGood = { at: Date.now(), value };
+    return value;
+  } catch (err) {
+    console.error('Cloak on-chain read failed:', err);
+    if (
+      cloakLastGood &&
+      Date.now() - cloakLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
+    ) {
+      const asOf = new Date(cloakLastGood.at).toISOString().slice(11, 16);
+      return {
+        ...cloakLastGood.value,
+        stats: `${cloakLastGood.value.stats} · stale (last read ${asOf} UTC)`,
+        stale: true,
+      };
+    }
+    throw err;
   }
 }
 
@@ -372,6 +476,8 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     elusivResult,
     pcResult,
     umbraResult,
+    nimbusResult,
+    cloakResult,
     arciumStakeResult,
     arciumMetaResult,
     magicblockSolResult,
@@ -437,6 +543,8 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       };
     })(),
     fetchUmbra(),
+    fetchNimbus(),
+    fetchCloak(),
     fetchArciumStakedArx(),
     fetchArciumNetworkMeta(),
     getTokenAccountBalance(POOL_ADDRESSES.MAGICBLOCK_SOL),
@@ -540,6 +648,38 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     console.error('Umbra fetch error:', umbraResult.reason);
     umbraError = 'Umbra TVL unavailable (upstream read failed)';
     umbraStats = 'Data temporarily unavailable — TVL not shown';
+  }
+
+  let nimbusPools: Pool[] = [];
+  let nimbusTvl = 0;
+  let nimbusStats: string | undefined;
+  let nimbusStale = false;
+  let nimbusError: string | undefined;
+  if (nimbusResult.status === 'fulfilled') {
+    nimbusPools = nimbusResult.value.pools;
+    nimbusTvl = nimbusResult.value.tvl;
+    nimbusStats = nimbusResult.value.stats;
+    nimbusStale = !!nimbusResult.value.stale;
+  } else {
+    console.error('Nimbus fetch error:', nimbusResult.reason);
+    nimbusError = 'Nimbus TVL unavailable (upstream read failed)';
+    nimbusStats = 'Data temporarily unavailable — TVL not shown';
+  }
+
+  let cloakPools: Pool[] = [];
+  let cloakTvl = 0;
+  let cloakStats: string | undefined;
+  let cloakStale = false;
+  let cloakError: string | undefined;
+  if (cloakResult.status === 'fulfilled') {
+    cloakPools = cloakResult.value.pools;
+    cloakTvl = cloakResult.value.tvl;
+    cloakStats = cloakResult.value.stats;
+    cloakStale = !!cloakResult.value.stale;
+  } else {
+    console.error('Cloak fetch error:', cloakResult.reason);
+    cloakError = 'Cloak TVL unavailable (on-chain read failed)';
+    cloakStats = 'Data temporarily unavailable — TVL not shown';
   }
 
   let ringsPools: Pool[] = [];
@@ -653,6 +793,30 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       stats: umbraStats,
       ...(umbraStale ? { stale: true } : {}),
       ...(umbraError ? { error: umbraError } : {}),
+    },
+    {
+      name: 'Nimbus',
+      status: 'live',
+      url: 'https://www.nimbusprivacy.xyz',
+      linkText: 'nimbusprivacy.xyz',
+      kind: 'pool',
+      pools: nimbusPools,
+      tvl: nimbusTvl,
+      stats: nimbusStats,
+      ...(nimbusStale ? { stale: true } : {}),
+      ...(nimbusError ? { error: nimbusError } : {}),
+    },
+    {
+      name: 'Cloak',
+      status: 'live',
+      url: 'https://cloak.ag',
+      linkText: 'cloak.ag',
+      kind: 'pool',
+      pools: cloakPools,
+      tvl: cloakTvl,
+      stats: cloakStats,
+      ...(cloakStale ? { stale: true } : {}),
+      ...(cloakError ? { error: cloakError } : {}),
     },
     {
       name: 'Arcium',

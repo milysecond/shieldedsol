@@ -13,11 +13,11 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description:
-    'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Arcium, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
+    'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Cloak, Nimbus, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
   openGraph: {
     title: `${SITE_NAME} - Real-Time Solana Privacy Pool Tracker`,
     description:
-      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Arcium, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
+      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Cloak, Nimbus, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
     url: SITE_URL,
     siteName: SITE_NAME,
     type: 'website',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     creator: '@shieldedsol',
     title: `${SITE_NAME} - Real-Time Solana Privacy Pool Tracker`,
     description:
-      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Arcium, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
+      'Track Solana privacy protocol TVL in real-time. Monitor Privacy Cash, Umbra, Cloak, Nimbus, Helius Rings, and other privacy pools with live balances, historical charts, and TVL alerts.',
     images: [
       {
         url: OG_IMAGE,
@@ -120,7 +120,7 @@ export default function RootLayout({
                 name: SITE_NAME,
                 url: SITE_URL,
                 description:
-                  'Real-time Solana privacy pool TVL tracker. Monitor Privacy Cash, Umbra and other privacy protocols with live balances, historical charts, and alerts.',
+                  'Real-time Solana privacy pool TVL tracker. Monitor Privacy Cash, Umbra, Cloak, Nimbus and other privacy protocols with live balances, historical charts, and alerts.',
                 applicationCategory: 'FinanceApplication',
                 operatingSystem: 'Web',
                 offers: {
