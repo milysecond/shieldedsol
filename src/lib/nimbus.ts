@@ -2,8 +2,9 @@
  * Nimbus TVL — read directly from Solana chain state.
  *
  * Nimbus is the ZK shielded-pool protocol behind Umbra v2 (listed on
- * DefiLlama as "Umbra Privacy V2"). Swish.cash routes it as its own rail,
- * distinct from Umbra v1 (the Arcium MPC pools).
+ * DefiLlama as "Umbra Privacy V2"). Its TVL is combined with Umbra V1
+ * on the single Umbra dashboard row (see protocols.ts); it is not
+ * listed as a standalone protocol.
  *
  * Addresses from docs.nimbusprivacy.xyz and the DefiLlama
  * umbra-privacy-v2 adapter:

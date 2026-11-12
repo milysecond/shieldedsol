@@ -126,16 +126,8 @@ export const PROTOCOL_DEFINITIONS = [
     status: 'live' as const,
     url: 'https://app.umbraprivacy.com',
     linkText: 'app.umbraprivacy.com',
-    // V1 Arcium pools; V2 deposits are listed under Nimbus
+    // V1 Arcium MPC pools + V2 Nimbus ZK shielded pool
     pools: ['kmSOL', 'wSOL', 'USDC', 'USDT', 'UMBRA', 'ZINC', 'CASH', 'ARX', 'OTHER'],
-  },
-  {
-    name: 'Nimbus',
-    status: 'live' as const,
-    url: 'https://www.nimbusprivacy.xyz',
-    linkText: 'nimbusprivacy.xyz',
-    // Dynamic: VaultAuthority ATAs + lamport vault (see nimbus.ts)
-    pools: ['SOL', 'USDC', 'USDT', 'OTHER'],
   },
   {
     name: 'Cloak',
@@ -218,7 +210,6 @@ export const DONATION_WALLET =
 export const PROTOCOL_X_HANDLES: Record<string, string> = {
   'Privacy Cash': 'theprivacycash',
   Umbra: 'UmbraPrivacy',
-  Nimbus: 'UmbraPrivacy',
   Cloak: 'cloak_ag',
   Arcium: 'Arcium',
   MagicBlock: 'magicblock',
@@ -257,10 +248,10 @@ export const PROTOCOL_PROGRAMS: Record<string, ProtocolProgram[]> = {
   'Privacy Cash': [
     { id: PRIVACY_CASH_PROGRAM, label: 'Privacy Cash' },
   ],
-  Umbra: [{ id: UMBRA_PROGRAM, label: 'Umbra V1' }],
-  Nimbus: [
-    { id: NIMBUS_SHIELDED_POOL, label: 'Shielded pool' },
-    { id: NIMBUS_USER_REGISTRY, label: 'User registry' },
+  Umbra: [
+    { id: UMBRA_PROGRAM, label: 'Umbra V1' },
+    { id: NIMBUS_SHIELDED_POOL, label: 'Nimbus (Umbra V2)' },
+    { id: NIMBUS_USER_REGISTRY, label: 'Nimbus user registry' },
   ],
   Cloak: [{ id: CLOAK_PROGRAM, label: 'Shield pool' }],
   Arcium: [{ id: ARCIUM_STAKING_PROGRAM, label: 'Arcium staking' }],

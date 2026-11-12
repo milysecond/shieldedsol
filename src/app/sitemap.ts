@@ -32,6 +32,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...[
       'privacy-cash',
       'umbra',
+      'cloak',
       'arcium',
       'magicblock',
       'helius-rings',
