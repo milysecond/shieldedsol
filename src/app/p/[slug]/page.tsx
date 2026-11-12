@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Dashboard from '@/components/Dashboard';
 import { SITE_NAME, SITE_URL, PROTOCOL_DEFINITIONS } from '@/lib/constants';
 import { slugifyProtocol } from '@/lib/slug';
@@ -23,6 +23,7 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+  if (slug.trim().toLowerCase() === 'nimbus') redirect('/p/umbra');
   const name = resolveName(slug);
   if (!name) {
     return { title: 'Protocol not found' };
@@ -54,6 +55,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProtocolDeepLinkPage({ params }: Props) {
   const { slug } = await params;
+  if (slug.trim().toLowerCase() === 'nimbus') redirect('/p/umbra');
   const name = resolveName(slug);
   // Allow unknown slugs to still load dashboard (live list may include extras)
   if (!name && !slug) notFound();

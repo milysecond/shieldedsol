@@ -2,8 +2,9 @@
  * Umbra Privacy V1 TVL — read directly from Solana chain state.
  *
  * This is the original Arcium-MPC shielded pool (program UMBRAD2…).
- * Umbra v2 deposits live in the Nimbus shielded pool and are reported
- * on the Nimbus row (see ./nimbus.ts) so the two are not double-counted.
+ * Umbra v2 deposits live in the Nimbus shielded pool (see ./nimbus.ts)
+ * and are combined with this V1 TVL on the single Umbra row, with no
+ * double counting.
  *
  * Mirrors the DefiLlama adapter projects/umbra-privacy-v1:
  *  - every V1 pool account of the Umbra program owns one SPL token
@@ -279,7 +280,9 @@ export async function fetchUmbraOnchain(
 /**
  * Fallback only: DefiLlama Umbra Privacy V1 Solana TVL (excl. staking).
  * Used when our on-chain read fails, so the row never silently drops to $0.
- * V2 is reported on the Nimbus row and must not be included here.
+ * V2 (Nimbus / umbra-privacy-v2) is fetched separately and added on
+ * the Umbra row; this helper must stay V1-only so the two are not
+ * double-counted.
  */
 export async function fetchUmbraFromLlama(): Promise<number> {
   const res = await fetch('https://api.llama.fi/tvl/umbra-privacy-v1', {

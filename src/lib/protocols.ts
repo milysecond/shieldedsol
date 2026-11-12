@@ -171,12 +171,19 @@ export interface ProtocolsResponse {
   cached?: boolean;
 }
 
-/** Last successful Umbra on-chain read (per isolate) */
-let umbraLastGood: {
-  at: number;
-  value: { pools: Pool[]; tvl: number; stats: string };
-} | null = null;
 const UMBRA_LAST_GOOD_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+type UmbraHalf = {
+  pools: Pool[];
+  tvl: number;
+  umbraTokenUsd: number;
+  source: 'on-chain' | 'last-good' | 'llama';
+  stale?: boolean;
+  asOfUtc?: string;
+};
+
+/** Last successful Umbra V1 on-chain read (per isolate) */
+let umbraLastGood: { at: number; value: UmbraHalf } | null = null;
 
 function fmtCompactUsd(n: number): string {
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
@@ -184,11 +191,89 @@ function fmtCompactUsd(n: number): string {
   return `$${Math.round(n)}`;
 }
 
+/** Last successful Umbra V2 (Nimbus) on-chain read (per isolate) */
+let nimbusLastGood: { at: number; value: UmbraHalf } | null = null;
+
+async function readUmbraV1(): Promise<UmbraHalf> {
+  try {
+    const r = await Promise.race([
+      fetchUmbraOnchain(RPC_URLS),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Umbra V1 on-chain timeout')), 6500)
+      ),
+    ]);
+    const value: UmbraHalf = {
+      pools: r.pools,
+      tvl: r.tvl,
+      umbraTokenUsd: r.umbraTokenUsd,
+      source: 'on-chain',
+    };
+    umbraLastGood = { at: Date.now(), value };
+    return value;
+  } catch (err) {
+    console.error('Umbra V1 on-chain read failed:', err);
+    if (
+      umbraLastGood &&
+      Date.now() - umbraLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
+    ) {
+      const asOf = new Date(umbraLastGood.at).toISOString().slice(11, 16);
+      return { ...umbraLastGood.value, source: 'last-good', stale: true, asOfUtc: asOf };
+    }
+    const tvl = await fetchUmbraFromLlama();
+    return { pools: [], tvl, umbraTokenUsd: 0, source: 'llama', stale: true };
+  }
+}
+
+async function readUmbraV2(): Promise<UmbraHalf> {
+  try {
+    const r = await Promise.race([
+      fetchNimbusOnchain(RPC_URLS),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Umbra V2 (Nimbus) on-chain timeout')), 6500)
+      ),
+    ]);
+    const value: UmbraHalf = {
+      pools: r.pools,
+      tvl: r.tvl,
+      umbraTokenUsd: r.umbraTokenUsd,
+      source: 'on-chain',
+    };
+    nimbusLastGood = { at: Date.now(), value };
+    return value;
+  } catch (err) {
+    console.error('Umbra V2 (Nimbus) on-chain read failed:', err);
+    if (
+      nimbusLastGood &&
+      Date.now() - nimbusLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
+    ) {
+      const asOf = new Date(nimbusLastGood.at).toISOString().slice(11, 16);
+      return { ...nimbusLastGood.value, source: 'last-good', stale: true, asOfUtc: asOf };
+    }
+    const tvl = await fetchNimbusFromLlama();
+    return { pools: [], tvl, umbraTokenUsd: 0, source: 'llama', stale: true };
+  }
+}
+
+function describeUmbraHalf(
+  half: UmbraHalf | null,
+  liveLabel: string,
+  missingLabel: string
+): string {
+  if (!half) return missingLabel;
+  if (half.source === 'llama') return `${liveLabel} DefiLlama`;
+  if (half.source === 'last-good') {
+    return `${liveLabel} stale (last read ${half.asOfUtc} UTC)`;
+  }
+  return liveLabel;
+}
+
 /**
- * Umbra V1 TVL from chain state (Arcium MPC pools; see ./umbra.ts).
- * V2 is reported separately as Nimbus.
- * Never resolves to a silent $0: on failure it serves the last good read,
- * then DefiLlama's Umbra TVL, and otherwise rejects so the row is flagged.
+ * Combined Umbra TVL: V1 Arcium MPC pools plus V2 Nimbus ZK shielded
+ * pool (program nimBUs55…). The two vault sets do not overlap, so
+ * summing is not double counting.
+ * Never resolves to a silent $0: each half falls back to last-good,
+ * then its DefiLlama adapter; only if both halves fail does this reject
+ * so the row is flagged.
  */
 async function fetchUmbra(): Promise<{
   pools: Pool[];
@@ -196,95 +281,43 @@ async function fetchUmbra(): Promise<{
   stats: string;
   stale?: boolean;
 }> {
-  try {
-    const r = await Promise.race([
-      fetchUmbraOnchain(RPC_URLS),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Umbra on-chain timeout')), 6500)
-      ),
-    ]);
-    const parts = ['V1 shielded pools · Arcium MPC · on-chain'];
-    if (r.umbraTokenUsd >= 1) {
-      parts.push(`excl. ${fmtCompactUsd(r.umbraTokenUsd)} UMBRA deposits`);
-    }
-    const value = { pools: r.pools, tvl: r.tvl, stats: parts.join(' · ') };
-    umbraLastGood = { at: Date.now(), value };
-    return value;
-  } catch (err) {
-    console.error('Umbra on-chain read failed:', err);
-    if (
-      umbraLastGood &&
-      Date.now() - umbraLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
-    ) {
-      const asOf = new Date(umbraLastGood.at).toISOString().slice(11, 16);
-      return {
-        ...umbraLastGood.value,
-        stats: `${umbraLastGood.value.stats} · stale (last read ${asOf} UTC)`,
-        stale: true,
-      };
-    }
-    const tvl = await fetchUmbraFromLlama();
-    return {
-      pools: [],
-      tvl,
-      stats: 'On-chain read failed · showing DefiLlama Umbra V1 TVL',
-      stale: true,
-    };
+  const [v1r, v2r] = await Promise.allSettled([readUmbraV1(), readUmbraV2()]);
+  const v1 = v1r.status === 'fulfilled' ? v1r.value : null;
+  const v2 = v2r.status === 'fulfilled' ? v2r.value : null;
+  if (v1r.status === 'rejected') {
+    console.error('Umbra V1 fetch error:', v1r.reason);
   }
-}
-
-/** Last successful Nimbus on-chain read (per isolate) */
-let nimbusLastGood: {
-  at: number;
-  value: { pools: Pool[]; tvl: number; stats: string };
-} | null = null;
-
-/**
- * Nimbus TVL from chain state (Umbra v2 vaults; see ./nimbus.ts).
- * Never resolves to a silent $0: on failure it serves the last good read,
- * then DefiLlama's Umbra Privacy V2 Solana TVL, and otherwise rejects.
- */
-async function fetchNimbus(): Promise<{
-  pools: Pool[];
-  tvl: number;
-  stats: string;
-  stale?: boolean;
-}> {
-  try {
-    const r = await Promise.race([
-      fetchNimbusOnchain(RPC_URLS),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Nimbus on-chain timeout')), 6500)
-      ),
-    ]);
-    const parts = ['ZK shielded pool · powers Umbra v2 · on-chain'];
-    if (r.umbraTokenUsd >= 1) {
-      parts.push(`excl. ${fmtCompactUsd(r.umbraTokenUsd)} UMBRA deposits`);
-    }
-    const value = { pools: r.pools, tvl: r.tvl, stats: parts.join(' · ') };
-    nimbusLastGood = { at: Date.now(), value };
-    return value;
-  } catch (err) {
-    console.error('Nimbus on-chain read failed:', err);
-    if (
-      nimbusLastGood &&
-      Date.now() - nimbusLastGood.at < UMBRA_LAST_GOOD_MAX_AGE_MS
-    ) {
-      const asOf = new Date(nimbusLastGood.at).toISOString().slice(11, 16);
-      return {
-        ...nimbusLastGood.value,
-        stats: `${nimbusLastGood.value.stats} · stale (last read ${asOf} UTC)`,
-        stale: true,
-      };
-    }
-    const tvl = await fetchNimbusFromLlama();
-    return {
-      pools: [],
-      tvl,
-      stats: 'On-chain read failed · showing DefiLlama Umbra V2 (Solana) TVL',
-      stale: true,
-    };
+  if (v2r.status === 'rejected') {
+    console.error('Umbra V2 (Nimbus) fetch error:', v2r.reason);
   }
+  if (!v1 && !v2) {
+    throw new Error('Umbra V1 and V2 TVL unavailable');
+  }
+
+  const tvl = (v1?.tvl ?? 0) + (v2?.tvl ?? 0);
+  const umbraTokenUsd = (v1?.umbraTokenUsd ?? 0) + (v2?.umbraTokenUsd ?? 0);
+  const v2Pools = (v2?.pools ?? []).map((pool) => ({
+    ...pool,
+    asset: `${pool.asset} (V2)`,
+  }));
+  const parts = [
+    'V1 + V2 shielded pools',
+    describeUmbraHalf(v1, 'V1 Arcium MPC', 'V1 unavailable'),
+    describeUmbraHalf(v2, 'V2 Nimbus ZK', 'V2 Nimbus unavailable'),
+  ];
+  if (v1?.source === 'on-chain' && v2?.source === 'on-chain') {
+    parts.push('on-chain');
+  }
+  if (umbraTokenUsd >= 1) {
+    parts.push(`excl. ${fmtCompactUsd(umbraTokenUsd)} UMBRA deposits`);
+  }
+  const stale = !!(v1?.stale || v2?.stale || !v1 || !v2);
+  return {
+    pools: [...(v1?.pools ?? []), ...v2Pools],
+    tvl,
+    stats: parts.join(' · '),
+    ...(stale ? { stale: true } : {}),
+  };
 }
 
 /** Last successful Cloak on-chain read (per isolate) */
@@ -476,7 +509,6 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     elusivResult,
     pcResult,
     umbraResult,
-    nimbusResult,
     cloakResult,
     arciumStakeResult,
     arciumMetaResult,
@@ -543,7 +575,6 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       };
     })(),
     fetchUmbra(),
-    fetchNimbus(),
     fetchCloak(),
     fetchArciumStakedArx(),
     fetchArciumNetworkMeta(),
@@ -648,22 +679,6 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     console.error('Umbra fetch error:', umbraResult.reason);
     umbraError = 'Umbra TVL unavailable (upstream read failed)';
     umbraStats = 'Data temporarily unavailable — TVL not shown';
-  }
-
-  let nimbusPools: Pool[] = [];
-  let nimbusTvl = 0;
-  let nimbusStats: string | undefined;
-  let nimbusStale = false;
-  let nimbusError: string | undefined;
-  if (nimbusResult.status === 'fulfilled') {
-    nimbusPools = nimbusResult.value.pools;
-    nimbusTvl = nimbusResult.value.tvl;
-    nimbusStats = nimbusResult.value.stats;
-    nimbusStale = !!nimbusResult.value.stale;
-  } else {
-    console.error('Nimbus fetch error:', nimbusResult.reason);
-    nimbusError = 'Nimbus TVL unavailable (upstream read failed)';
-    nimbusStats = 'Data temporarily unavailable — TVL not shown';
   }
 
   let cloakPools: Pool[] = [];
@@ -793,18 +808,6 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
       stats: umbraStats,
       ...(umbraStale ? { stale: true } : {}),
       ...(umbraError ? { error: umbraError } : {}),
-    },
-    {
-      name: 'Nimbus',
-      status: 'live',
-      url: 'https://www.nimbusprivacy.xyz',
-      linkText: 'nimbusprivacy.xyz',
-      kind: 'pool',
-      pools: nimbusPools,
-      tvl: nimbusTvl,
-      stats: nimbusStats,
-      ...(nimbusStale ? { stale: true } : {}),
-      ...(nimbusError ? { error: nimbusError } : {}),
     },
     {
       name: 'Cloak',
