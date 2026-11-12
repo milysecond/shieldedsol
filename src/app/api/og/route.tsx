@@ -149,10 +149,10 @@ export async function GET() {
       ? totalTvl
       : livePools.reduce((s, p) => s + p.tvl, 0);
   const poolProtos = livePools.slice(0, 3);
-    const denom = liveTotal > 0 ? liveTotal : 1;
-    // SOL-equivalent of total USD (aggregate only — not per non-SOL pool)
-    const solEq = solPrice > 0 ? liveTotal / solPrice : 0;
-    const topShare = poolProtos[0] ? (poolProtos[0].tvl / denom) * 100 : 0;
+  const denom = liveTotal > 0 ? liveTotal : 1;
+  // Native SOL across live privacy pools — never invent SOL from USD
+  const nativeSolTotal = livePools.reduce((s, p) => s + nativeSolBalance(p), 0);
+  const topShare = poolProtos[0] ? (poolProtos[0].tvl / denom) * 100 : 0;
 
   let logoSrc = `${SITE_URL}/logo.png`;
   try {
@@ -357,7 +357,7 @@ export async function GET() {
               >
                 {fmtUsdFull(liveTotal)}
               </div>
-              {solEq > 0 ? (
+              {nativeSolTotal > 0 ? (
                 <div
                   style={{
                     display: 'flex',
@@ -368,7 +368,7 @@ export async function GET() {
                     fontWeight: 700,
                   }}
                 >
-                  ≈ {fmtSol(solEq)}
+                  {fmtSol(nativeSolTotal)}
                   <span style={{ fontSize: 18, color: '#9945FF' }}>SOL</span>
                 </div>
               ) : null}

@@ -2,7 +2,7 @@
 // Do NOT serve the old static og-base.png card.
 export async function onRequest() {
   const imageRes = await fetch(
-    'https://www.shieldedsol.com/api/og?v=20260805b',
+    'https://www.shieldedsol.com/api/og?v=20261112a',
     { headers: { 'Cache-Control': 'no-cache' } }
   );
   if (!imageRes.ok) {
