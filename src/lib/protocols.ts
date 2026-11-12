@@ -5,6 +5,7 @@ import {
   ARCIUM_STAKING_PROGRAM,
   ARCIUM_OPERATOR_ACCOUNT_SIZE,
   PROTOCOL_PROGRAMS,
+  MAGICBLOCK_REF_URL,
 } from './constants';
 import { fetchUmbraOnchain, fetchUmbraFromLlama } from './umbra';
 import { fetchNimbusOnchain, fetchNimbusFromLlama } from './nimbus';
@@ -834,7 +835,7 @@ async function buildProtocolsData(): Promise<ProtocolsResponse> {
     {
       name: 'MagicBlock',
       status: 'live',
-      url: 'https://one.magicblock.app',
+      url: MAGICBLOCK_REF_URL,
       linkText: 'one.magicblock.app',
       kind: 'pool',
       pools: [

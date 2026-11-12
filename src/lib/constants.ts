@@ -94,8 +94,23 @@ export const VOIDIFY_CORE_PROGRAM =
 export const VOIDIFY_USER_VOID_PROGRAM =
   'voiDecqpJdvgeCG9CerdEZY7WwY1mrQM1n3jDnWMzPi';
 
+/** Public donation address for Shielded Sol */
+export const DONATION_WALLET =
+  'shLDydVFjPS6zyYo1WJ6JAVeqHf2PAxa2jiLDb8Tudt';
+
+/** Append ?ref= for protocols whose affiliate links use a wallet param. */
+export function withRefUrl(
+  baseUrl: string,
+  ref: string = DONATION_WALLET
+): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set('ref', ref);
+  return url.toString();
+}
+
 /** MagicBlock private payments / shield */
 export const MAGICBLOCK_URL = 'https://one.magicblock.app';
+export const MAGICBLOCK_REF_URL = withRefUrl(MAGICBLOCK_URL);
 export const MAGICBLOCK_PROGRAM =
   'SPLxh1LVZzEkX99H6rqYizhytLWPZVV296zyYDPagv2';
 
@@ -146,7 +161,7 @@ export const PROTOCOL_DEFINITIONS = [
   {
     name: 'MagicBlock',
     status: 'live' as const,
-    url: 'https://one.magicblock.app',
+    url: MAGICBLOCK_REF_URL,
     linkText: 'one.magicblock.app',
     pools: ['SOL', 'USDC'],
   },
@@ -201,10 +216,6 @@ export const PROTOCOL_DEFINITIONS = [
 
 // Shared Solana RPC (Helius)
 export const SOLANA_RPC = 'https://viviyan-bkj12u-fast-mainnet.helius-rpc.com';
-
-/** Public donation address for Shielded Sol */
-export const DONATION_WALLET =
-  'shLDydVFjPS6zyYo1WJ6JAVeqHf2PAxa2jiLDb8Tudt';
 
 /** X handles for share/tweet tags (no @ prefix) — verified 2026-08 */
 export const PROTOCOL_X_HANDLES: Record<string, string> = {
