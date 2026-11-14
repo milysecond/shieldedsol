@@ -1,30 +1,32 @@
 import { MetadataRoute } from 'next';
 import { SITE_URL } from '@/lib/constants';
 
+// Pin lastModified so sitemap.xml is stable across requests.
+const LAST_MODIFIED = '2026-11-13';
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
   return [
     {
       url: SITE_URL,
-      lastModified: now,
+      lastModified: LAST_MODIFIED,
       changeFrequency: 'hourly',
       priority: 1.0,
     },
     {
       url: `${SITE_URL}/history`,
-      lastModified: now,
+      lastModified: LAST_MODIFIED,
       changeFrequency: 'daily',
       priority: 0.8,
     },
     {
       url: `${SITE_URL}/lookout`,
-      lastModified: now,
+      lastModified: LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.75,
     },
     {
       url: `${SITE_URL}/brand`,
-      lastModified: now,
+      lastModified: LAST_MODIFIED,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
@@ -44,27 +46,21 @@ export default function sitemap(): MetadataRoute.Sitemap {
       'elusiv',
     ].map((slug) => ({
       url: `${SITE_URL}/p/${slug}`,
-      lastModified: now,
+      lastModified: LAST_MODIFIED,
       changeFrequency: 'hourly' as const,
       priority: 0.65,
     })),
     {
       url: `${SITE_URL}/add`,
-      lastModified: now,
+      lastModified: LAST_MODIFIED,
       changeFrequency: 'monthly',
       priority: 0.6,
     },
     {
       url: `${SITE_URL}/developers`,
-      lastModified: now,
+      lastModified: LAST_MODIFIED,
       changeFrequency: 'weekly',
       priority: 0.7,
-    },
-    {
-      url: `${SITE_URL}/api/v1/openapi.json`,
-      lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.5,
     },
   ];
 }
