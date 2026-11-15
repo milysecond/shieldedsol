@@ -86,36 +86,70 @@ async function fetchTVL() {
   return { tvlFormatted, change, topBlock, tags };
 }
 
+class TweetApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'TweetApiError';
+    this.status = status;
+  }
+}
+
+function tweetErrorStatus(error: unknown): number {
+  if (error instanceof TweetApiError) {
+    if (error.status === 429) return 429;
+    if (error.status === 503) return 503;
+    return 502;
+  }
+  return 500;
+}
+
 async function postTweet(text: string) {
   const apiKey = process.env.TWEETAPI;
   const authToken = process.env.TWITTER_AUTH_TOKEN;
+  const proxy = process.env.TWEET_PROXY;
 
   if (!apiKey || !authToken) {
-    throw new Error('TweetAPI credentials not configured');
+    throw new TweetApiError('TweetAPI credentials not configured', 503);
   }
 
-  const body = {
+  const body: {
+    authToken: string;
+    text: string;
+    media: { url: string }[];
+    proxy?: string;
+  } = {
     authToken,
     text,
-    proxy: '142.111.48.253:7030@khdrutfi:6k4w4qxpoqep',
     media: [{ url: `${SITE_URL}/api/og?v=20261112a` }],
   };
+  if (proxy) body.proxy = proxy;
 
-  const response = await fetch(
-    'https://api.tweetapi.com/tw-v2/interaction/create-post-with-media',
-    {
-      method: 'POST',
-      headers: {
-        'X-API-Key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    }
-  );
+  let response: Response;
+  try {
+    response = await fetch(
+      'https://api.tweetapi.com/tw-v2/interaction/create-post-with-media',
+      {
+        method: 'POST',
+        headers: {
+          'X-API-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20_000),
+      }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    throw new TweetApiError(`TweetAPI request failed: ${message}`, 502);
+  }
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`TweetAPI error: ${response.status} - ${errorBody}`);
+    const errorBody = (await response.text()).slice(0, 500);
+    throw new TweetApiError(
+      `TweetAPI error: ${response.status} - ${errorBody}`,
+      response.status
+    );
   }
 
   return response.json();
@@ -160,7 +194,7 @@ export async function GET(request: NextRequest) {
         error: 'Failed to post tweet',
         message: error instanceof Error ? error.message : 'Unknown error',
       },
-      { status: 500 }
+      { status: tweetErrorStatus(error) }
     );
   }
 }
