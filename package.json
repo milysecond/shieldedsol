@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test:oauth": "node --experimental-strip-types --test src/lib/x-oauth.test.ts",
     "pages:build": "npx @cloudflare/next-on-pages",
     "pages:dev": "npx wrangler pages dev .vercel/output/static --compatibility-flag=nodejs_compat",
     "db:init": "node db/init.js",
