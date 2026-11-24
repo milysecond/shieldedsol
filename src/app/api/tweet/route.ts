@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PROTOCOL_X_HANDLES, SITE_URL } from '@/lib/constants';
+import { signOAuth1, type OAuth1Credentials } from '@/lib/x-oauth';
 
 const OG_IMAGE_URL = `${SITE_URL}/api/og?v=20261112a`;
-const TWITTERAPI_BASE = 'https://api.twitterapi.io';
-const QPS_DELAY_MS = 6_000;
+const X_API_BASE = 'https://api.x.com';
+const DEFAULT_EXPECTED_USERNAME = 'ShieldedSol';
+const MAX_TWEET_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function fmtShareUsd(n: number): string {
   if (!n || n <= 0) return '$--';
@@ -90,7 +92,7 @@ async function fetchTVL() {
   return { tvlFormatted, change, topBlock, tags };
 }
 
-type TweetStage = 'og_fetch' | 'upload_media' | 'create_tweet';
+type TweetStage = 'account_check' | 'og_fetch' | 'upload_media' | 'create_tweet';
 
 class TweetApiError extends Error {
   status: number;
@@ -98,6 +100,8 @@ class TweetApiError extends Error {
   upstreamStatus?: number;
   upstreamMessage?: string;
   missing?: string[];
+  expected?: string;
+  actual?: string;
 
   constructor(
     message: string,
@@ -107,6 +111,8 @@ class TweetApiError extends Error {
       upstreamStatus?: number;
       upstreamMessage?: string;
       missing?: string[];
+      expected?: string;
+      actual?: string;
     }
   ) {
     super(message);
@@ -116,11 +122,14 @@ class TweetApiError extends Error {
     this.upstreamStatus = extra?.upstreamStatus;
     this.upstreamMessage = extra?.upstreamMessage;
     this.missing = extra?.missing;
+    this.expected = extra?.expected;
+    this.actual = extra?.actual;
   }
 }
 
 function tweetErrorStatus(error: unknown): number {
   if (error instanceof TweetApiError) {
+    if (error.status === 403) return 403;
     if (error.status === 429) return 429;
     if (error.status === 503) return 503;
     return 502;
@@ -135,7 +144,6 @@ function redactSecrets(value: string, secrets: string[]): string {
       out = out.split(secret).join('[redacted]');
     }
   }
-  out = out.replace(/https?:\/\/[^/\s'"]+:[^/\s'"]+@[^/\s'"]+/gi, '[redacted-proxy]');
   return out.slice(0, 500);
 }
 
@@ -157,50 +165,169 @@ function upstreamMessageOf(
   data: Record<string, unknown>,
   secrets: string[]
 ): string {
-  const raw = data.message ?? data.msg ?? data.error ?? data.detail;
+  const errors = data.errors;
+  let raw: unknown =
+    data.detail ?? data.title ?? data.message ?? data.msg ?? data.error;
+  if (
+    raw == null &&
+    Array.isArray(errors) &&
+    errors[0] &&
+    typeof errors[0] === 'object'
+  ) {
+    const first = errors[0] as Record<string, unknown>;
+    raw = first.detail ?? first.message ?? first.title;
+  }
   const text =
-    typeof raw === 'string'
-      ? raw
-      : raw != null
-        ? JSON.stringify(raw)
-        : '';
+    typeof raw === 'string' ? raw : raw != null ? JSON.stringify(raw) : '';
   return redactSecrets(text, secrets);
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function bytesToBase64(bytes: Uint8Array): string {
+  const chunk = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
 }
 
-async function postTweet(text: string) {
-  const apiKey = process.env.TWITTERAPI_IO_KEY?.trim();
-  const rawProxy = process.env.TWEET_PROXY?.trim();
-  const prebuiltCookies = process.env.TWITTER_LOGIN_COOKIES?.trim();
-  const authToken = process.env.TWITTER_AUTH_TOKEN?.trim();
-  const ct0 = process.env.TWITTER_CT0?.trim();
+type XAccount = { id: string; username: string; name?: string };
+
+function loadXCredentials(): {
+  credentials: OAuth1Credentials;
+  secrets: string[];
+  expectedUsername: string;
+} {
+  const consumerKey = process.env.X_API_KEY?.trim();
+  const consumerSecret = process.env.X_API_SECRET?.trim();
+  const token = process.env.X_ACCESS_TOKEN?.trim();
+  const tokenSecret = process.env.X_ACCESS_TOKEN_SECRET?.trim();
 
   const missing: string[] = [];
-  if (!apiKey) missing.push('TWITTERAPI_IO_KEY');
-  if (!rawProxy) missing.push('TWEET_PROXY');
-  if (!prebuiltCookies) {
-    if (!authToken) missing.push('TWITTER_AUTH_TOKEN');
-    if (!ct0) missing.push('TWITTER_CT0');
-  }
+  if (!consumerKey) missing.push('X_API_KEY');
+  if (!consumerSecret) missing.push('X_API_SECRET');
+  if (!token) missing.push('X_ACCESS_TOKEN');
+  if (!tokenSecret) missing.push('X_ACCESS_TOKEN_SECRET');
   if (missing.length > 0) {
+    throw new TweetApiError(`Missing credentials: ${missing.join(', ')}`, 503, {
+      missing,
+    });
+  }
+
+  const expectedUsername = (
+    process.env.X_EXPECTED_USERNAME?.trim() || DEFAULT_EXPECTED_USERNAME
+  ).replace(/^@/, '');
+
+  return {
+    credentials: {
+      consumerKey: consumerKey!,
+      consumerSecret: consumerSecret!,
+      token: token!,
+      tokenSecret: tokenSecret!,
+    },
+    secrets: [consumerKey!, consumerSecret!, token!, tokenSecret!],
+    expectedUsername,
+  };
+}
+
+async function xApiFetch(
+  credentials: OAuth1Credentials,
+  method: string,
+  url: string,
+  options?: { json?: unknown; signal?: AbortSignal }
+): Promise<Response> {
+  const signed = await signOAuth1({ method, url, credentials });
+  const headers: Record<string, string> = {
+    Authorization: signed.authorization,
+    Accept: 'application/json',
+  };
+  let body: string | undefined;
+  if (options?.json !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify(options.json);
+  }
+  return fetch(url, {
+    method,
+    headers,
+    body,
+    signal: options?.signal,
+    cache: 'no-store',
+  });
+}
+
+async function getAuthenticatedAccount(
+  credentials: OAuth1Credentials,
+  secrets: string[]
+): Promise<XAccount> {
+  let response: Response;
+  try {
+    response = await xApiFetch(
+      credentials,
+      'GET',
+      `${X_API_BASE}/2/users/me`,
+      { signal: AbortSignal.timeout(15_000) }
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
     throw new TweetApiError(
-      `Missing credentials: ${missing.join(', ')}`,
-      503,
-      { missing }
+      `Account check request failed: ${redactSecrets(message, secrets)}`,
+      502,
+      {
+        stage: 'account_check',
+        upstreamMessage: redactSecrets(message, secrets),
+      }
     );
   }
 
-  const loginCookies =
-    prebuiltCookies ||
-    btoa(JSON.stringify({ auth_token: authToken!.trim(), ct0: ct0!.trim() }));
-  const proxy = rawProxy!.includes('://') ? rawProxy! : `http://${rawProxy}`;
-  const secrets = [apiKey!, authToken || '', ct0 || '', loginCookies, proxy].filter(
-    Boolean
-  );
+  const json = await readJson(response);
+  if (!response.ok) {
+    throw new TweetApiError('X API account check failed', 502, {
+      stage: 'account_check',
+      upstreamStatus: response.status,
+      upstreamMessage: upstreamMessageOf(json, secrets),
+    });
+  }
 
+  const data =
+    json.data && typeof json.data === 'object' && !Array.isArray(json.data)
+      ? (json.data as Record<string, unknown>)
+      : undefined;
+  const username = typeof data?.username === 'string' ? data.username : '';
+  const id = typeof data?.id === 'string' ? data.id : '';
+  if (!username || !id) {
+    throw new TweetApiError('X API account check returned no user', 502, {
+      stage: 'account_check',
+      upstreamStatus: response.status,
+    });
+  }
+
+  return {
+    id,
+    username,
+    name: typeof data?.name === 'string' ? data.name : undefined,
+  };
+}
+
+function assertExpectedAccount(
+  account: XAccount,
+  expectedUsername: string
+): void {
+  if (account.username.toLowerCase() !== expectedUsername.toLowerCase()) {
+    throw new TweetApiError(
+      `Authenticated X account @${account.username} does not match expected @${expectedUsername}`,
+      403,
+      {
+        stage: 'account_check',
+        expected: expectedUsername,
+        actual: account.username,
+      }
+    );
+  }
+}
+
+async function fetchOgImage(
+  secrets: string[]
+): Promise<{ bytes: Uint8Array; status: number }> {
   let ogRes: Response;
   try {
     ogRes = await fetch(OG_IMAGE_URL, {
@@ -215,34 +342,49 @@ async function postTweet(text: string) {
     });
   }
   if (!ogRes.ok) {
-    throw new TweetApiError(
-      `OG image fetch failed: ${ogRes.status}`,
-      502,
-      { stage: 'og_fetch', upstreamStatus: ogRes.status }
-    );
+    throw new TweetApiError(`OG image fetch failed: ${ogRes.status}`, 502, {
+      stage: 'og_fetch',
+      upstreamStatus: ogRes.status,
+    });
   }
-  const ogBytes = new Uint8Array(await ogRes.arrayBuffer());
-  if (ogBytes.byteLength === 0) {
+  const bytes = new Uint8Array(await ogRes.arrayBuffer());
+  if (bytes.byteLength === 0) {
     throw new TweetApiError('OG image was empty', 502, { stage: 'og_fetch' });
   }
+  return { bytes, status: ogRes.status };
+}
 
-  const form = new FormData();
-  form.append(
-    'file',
-    new Blob([ogBytes], { type: 'image/png' }),
-    'shieldedsol-tvl.png'
-  );
-  form.append('proxy', proxy);
-  form.append('login_cookies', loginCookies);
+async function uploadTweetImage(
+  credentials: OAuth1Credentials,
+  secrets: string[],
+  bytes: Uint8Array
+): Promise<string> {
+  if (bytes.byteLength > MAX_TWEET_IMAGE_BYTES) {
+    throw new TweetApiError(
+      `OG image is too large for tweet_image (${bytes.byteLength} bytes)`,
+      502,
+      { stage: 'upload_media' }
+    );
+  }
 
+  // Official simple upload for images <5MB: JSON body with base64 `media`.
+  // media_type is not a field on POST /2/media/upload (additionalProperties: false).
+  // OAuth 1.0a signs only query + oauth_* params — JSON body is excluded.
+  // https://docs.x.com/x-api/media/upload-media
   let uploadRes: Response;
   try {
-    uploadRes = await fetch(`${TWITTERAPI_BASE}/twitter/upload_media_v2`, {
-      method: 'POST',
-      headers: { 'X-API-Key': apiKey! },
-      body: form,
-      signal: AbortSignal.timeout(20_000),
-    });
+    uploadRes = await xApiFetch(
+      credentials,
+      'POST',
+      `${X_API_BASE}/2/media/upload`,
+      {
+        json: {
+          media: bytesToBase64(bytes),
+          media_category: 'tweet_image',
+        },
+        signal: AbortSignal.timeout(20_000),
+      }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     throw new TweetApiError(`Media upload request failed: ${message}`, 502, {
@@ -253,47 +395,46 @@ async function postTweet(text: string) {
 
   const uploadJson = await readJson(uploadRes);
   if (uploadRes.status === 429) {
-    throw new TweetApiError('twitterapi.io rate limited during media upload', 429, {
+    throw new TweetApiError('X API rate limited during media upload', 429, {
       stage: 'upload_media',
       upstreamStatus: 429,
       upstreamMessage: upstreamMessageOf(uploadJson, secrets),
     });
   }
-  const uploadStatus = uploadJson.status;
-  const mediaId =
-    typeof uploadJson.media_id === 'string' ? uploadJson.media_id : '';
-  if (!uploadRes.ok || uploadStatus !== 'success' || !mediaId) {
-    throw new TweetApiError('twitterapi.io media upload failed', 502, {
+
+  const data =
+    uploadJson.data &&
+    typeof uploadJson.data === 'object' &&
+    !Array.isArray(uploadJson.data)
+      ? (uploadJson.data as Record<string, unknown>)
+      : undefined;
+  const mediaId = typeof data?.id === 'string' ? data.id : '';
+  if (!uploadRes.ok || !mediaId) {
+    throw new TweetApiError('X API media upload failed', 502, {
       stage: 'upload_media',
       upstreamStatus: uploadRes.status,
       upstreamMessage: upstreamMessageOf(uploadJson, secrets),
     });
   }
+  return mediaId;
+}
 
-  await delay(QPS_DELAY_MS);
-
-  const createBody = JSON.stringify({
-    login_cookies: loginCookies,
-    tweet_text: text,
-    proxy,
-    media_ids: [mediaId],
-  });
-
-  async function createTweet(): Promise<Response> {
-    return fetch(`${TWITTERAPI_BASE}/twitter/create_tweet_v2`, {
-      method: 'POST',
-      headers: {
-        'X-API-Key': apiKey!,
-        'Content-Type': 'application/json',
-      },
-      body: createBody,
-      signal: AbortSignal.timeout(20_000),
-    });
-  }
-
+async function createTweet(
+  credentials: OAuth1Credentials,
+  secrets: string[],
+  text: string,
+  mediaId: string
+): Promise<{ tweetId: string; result: Record<string, unknown> }> {
+  // https://docs.x.com/x-api/posts/create-post — success is HTTP 201, data.id
   let createRes: Response;
   try {
-    createRes = await createTweet();
+    createRes = await xApiFetch(credentials, 'POST', `${X_API_BASE}/2/tweets`, {
+      json: {
+        text,
+        media: { media_ids: [mediaId] },
+      },
+      signal: AbortSignal.timeout(20_000),
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     throw new TweetApiError(`Create tweet request failed: ${message}`, 502, {
@@ -302,48 +443,49 @@ async function postTweet(text: string) {
     });
   }
 
+  const createJson = await readJson(createRes);
   if (createRes.status === 429) {
-    await delay(QPS_DELAY_MS);
-    try {
-      createRes = await createTweet();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      throw new TweetApiError(
-        `Create tweet retry request failed: ${message}`,
-        502,
-        {
-          stage: 'create_tweet',
-          upstreamMessage: redactSecrets(message, secrets),
-        }
-      );
-    }
-    if (createRes.status === 429) {
-      const retryJson = await readJson(createRes);
-      throw new TweetApiError('twitterapi.io rate limited during create tweet', 429, {
-        stage: 'create_tweet',
-        upstreamStatus: 429,
-        upstreamMessage: upstreamMessageOf(retryJson, secrets),
-      });
-    }
+    throw new TweetApiError('X API rate limited during create tweet', 429, {
+      stage: 'create_tweet',
+      upstreamStatus: 429,
+      upstreamMessage: upstreamMessageOf(createJson, secrets),
+    });
   }
 
-  const createJson = await readJson(createRes);
-  const createStatus = createJson.status;
-  const tweetId =
-    typeof createJson.tweet_id === 'string' ? createJson.tweet_id : '';
-  if (!createRes.ok || createStatus !== 'success' || !tweetId) {
-    throw new TweetApiError('twitterapi.io create tweet failed', 502, {
+  const data =
+    createJson.data &&
+    typeof createJson.data === 'object' &&
+    !Array.isArray(createJson.data)
+      ? (createJson.data as Record<string, unknown>)
+      : undefined;
+  const tweetId = typeof data?.id === 'string' ? data.id : '';
+  if ((!createRes.ok && createRes.status !== 201) || !tweetId) {
+    throw new TweetApiError('X API create tweet failed', 502, {
       stage: 'create_tweet',
       upstreamStatus: createRes.status,
       upstreamMessage: upstreamMessageOf(createJson, secrets),
     });
   }
 
-  return {
-    tweetId,
-    tweetUrl: `https://x.com/ShieldedSol/status/${tweetId}`,
-    result: createJson,
-  };
+  return { tweetId, result: createJson };
+}
+
+function buildTweetText(
+  tvlFormatted: string,
+  change: string,
+  topBlock: string,
+  tags: string
+): string {
+  return [
+    `Solana privacy pool TVL: ${tvlFormatted}${
+      change ? ` (${change} 24h)` : ''
+    }`,
+    topBlock || null,
+    tags,
+    'shieldedsol.com',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 export async function GET(request: NextRequest) {
@@ -357,27 +499,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const dryRun = request.nextUrl.searchParams.get('dry_run') === '1';
+
   try {
+    const { credentials, secrets, expectedUsername } = loadXCredentials();
+    const account = await getAuthenticatedAccount(credentials, secrets);
+    assertExpectedAccount(account, expectedUsername);
+
     const { tvlFormatted, change, topBlock, tags } = await fetchTVL();
+    const tweetText = buildTweetText(tvlFormatted, change, topBlock, tags);
 
-    const tweetText = [
-      `Solana privacy pool TVL: ${tvlFormatted}${
-        change ? ` (${change} 24h)` : ''
-      }`,
-      topBlock || null,
-      tags,
-      'shieldedsol.com',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+    if (dryRun) {
+      const og = await fetchOgImage(secrets);
+      return NextResponse.json({
+        ok: true,
+        dryRun: true,
+        account,
+        tweetText,
+        ogStatus: og.status,
+        ogBytes: og.bytes.byteLength,
+      });
+    }
 
-    const posted = await postTweet(tweetText);
+    const og = await fetchOgImage(secrets);
+    const mediaId = await uploadTweetImage(credentials, secrets, og.bytes);
+    const posted = await createTweet(credentials, secrets, tweetText, mediaId);
+    const tweetUrl = `https://x.com/${account.username}/status/${posted.tweetId}`;
 
     return NextResponse.json({
       success: true,
-      tweet: tweetText,
+      ok: true,
       tweetId: posted.tweetId,
-      tweetUrl: posted.tweetUrl,
+      tweetUrl,
+      account,
+      mediaAttached: true,
+      tweetText,
+      tweet: tweetText,
       result: posted.result,
     });
   } catch (error) {
@@ -389,8 +546,10 @@ export async function GET(request: NextRequest) {
       upstreamStatus?: number;
       upstreamMessage?: string;
       missing?: string[];
+      expected?: string;
+      actual?: string;
     } = {
-      error: 'Failed to post tweet',
+      error: dryRun ? 'Dry run failed' : 'Failed to post tweet',
       message: error instanceof Error ? error.message : 'Unknown error',
     };
     if (error instanceof TweetApiError) {
@@ -398,6 +557,8 @@ export async function GET(request: NextRequest) {
       if (error.upstreamStatus != null) body.upstreamStatus = error.upstreamStatus;
       if (error.upstreamMessage) body.upstreamMessage = error.upstreamMessage;
       if (error.missing) body.missing = error.missing;
+      if (error.expected) body.expected = error.expected;
+      if (error.actual) body.actual = error.actual;
     }
     return NextResponse.json(body, { status: tweetErrorStatus(error) });
   }
